@@ -33,15 +33,6 @@ class APIResponse(BaseModel):
             return cls(prices=[PriceItem.model_validate(item) for item in raw_prices])
 
     def as_markdown(self) -> str:
-        message_lines = ["*Zonneplan Hourly Prices:*"]
-        for price_item in self.prices:
-            start_time = price_item.start_date.strftime("%Y-%m-%d %H:%M")
-            end_time = price_item.end_date.strftime("%Y-%m-%d %H:%M")
-            price = price_item.price
-            message_lines.append(f"{start_time} - {end_time}: €{price}")
-        return "\n".join(message_lines)
-
-    def format_telegram_message(self) -> str:
         class FormattedItem(NamedTuple):
             hour_range: str
             price: float
@@ -67,24 +58,22 @@ class APIResponse(BaseModel):
         avg_price = sum(prices_only) / len(prices_only)
 
         # Find the price of the current hour
+        current_hour = datetime.datetime.now().astimezone().hour
         current_price = next(
             (
                 x.price
                 for x in formatted_items
-                if datetime.datetime.now().astimezone().hour
-                == datetime.datetime.strptime(x.hour_range.split(" - ")[0], "%H:%M")
-                .astimezone()
-                .hour
+                if current_hour == int(x.hour_range.split(" - ")[0].split(":")[0])
             ),
             prices_only[0],
         )
 
         return (
-            "⚡ ## Zonneplan - Prezzi Energia ⚡\n\n"
+            "⚡ Zonneplan - Prezzi Energia ⚡\n\n"
             f"💡 *Tariffa attuale:* `{current_price:.2f} €/kWh`\n\n"
-            "📊 ## Riepilogo Giornaliero:\n"
-            f"• 📉 **Minimo:** `{min_price:.2f} €/kWh`\n"
-            f"• 📈 **Massimo:** `{max_price:.2f} €/kWh`\n"
-            f"• ⚖️ **Media:** `{avg_price:.2f} €/kWh`\n\n"
+            "📊 Riepilogo Giornaliero\n"
+            f"• **Minimo:** `{min_price:.2f} €/kWh`\n"
+            f"• **Massimo:** `{max_price:.2f} €/kWh`\n"
+            f"• **Media:** `{avg_price:.2f} €/kWh`\n\n"
             "_Made with ❤️ by Crissal1995_"
         )
