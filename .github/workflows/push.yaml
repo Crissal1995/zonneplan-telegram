@@ -1,5 +1,5 @@
 ---
-name: ✈️
+name: Send Telegram message
 
 on:
   schedule:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   run-bot:
+    name: ✈️
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

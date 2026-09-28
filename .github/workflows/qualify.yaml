@@ -1,12 +1,12 @@
 ---
-name: 🐍
+name: Qualification
 
 on:
   pull_request:
 
 jobs:
   qualification:
-    name: Run qualification checks
+    name: 🐍
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
