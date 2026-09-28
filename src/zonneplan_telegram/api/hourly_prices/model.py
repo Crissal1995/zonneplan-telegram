@@ -13,7 +13,10 @@ class PriceItem(BaseModel):
 
     @property
     def price(self) -> float:
-        return self.price_tax_included["amount"]
+        """
+        Returns the price of the time span in EUR.
+        """
+        return self.price_tax_included["amount"] * 10e-8
 
 
 class APIResponse(BaseModel):
@@ -35,5 +38,5 @@ class APIResponse(BaseModel):
             start_time = price_item.start_date.strftime("%Y-%m-%d %H:%M")
             end_time = price_item.end_date.strftime("%Y-%m-%d %H:%M")
             price = price_item.price
-            message_lines.append(f"{start_time} - {end_time}: €{price:.2f}")
+            message_lines.append(f"{start_time} - {end_time}: €{price}")
         return "\n".join(message_lines)
