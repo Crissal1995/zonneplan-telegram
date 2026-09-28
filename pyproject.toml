@@ -1,7 +1,62 @@
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13"]
+build-backend = "uv_build"
+
 [project]
 name = "zonneplan-telegram"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "loguru>=0.7.3",
+    "pydantic>=2.13.5",
+    "requests>=2.34.2",
+]
+
+[dependency-groups]
+dev = [
+    "python-dotenv>=1.2.3",
+    "ruff>=0.16.9",
+    "ty>=0.0.84",
+]
+
+[project.scripts]
+zonneplan_telegram = "zonneplan_telegram.bot:main"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "CPY", # Copyright rules
+    "COM812", # Comma rule conflicting with `ruff format`
+    "D", # Docstring rules
+]
+
+[tool.tox]
+env_list = ["lint", "format", "type"]
+
+[tool.tox.env.lint]
+description = "Run linters"
+deps = ["ruff"]
+commands = [["ruff", "check"]]
+
+[tool.tox.env.format]
+description = "Run formatter"
+deps = ["ruff"]
+commands = [["ruff", "format", "--check"]]
+
+[tool.tox.env.type]
+description = "Run type checker"
+deps = ["ty"]
+commands = [["ty", "check"]]
+
+[tool.tox.env.fix]
+description = "Fix issues"
+deps = ["ruff", "ty"]
+commands = [
+    ["ruff", "format"],
+    ["ruff", "check", "--fix"],
+]

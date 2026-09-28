@@ -1,0 +1,20 @@
+---
+name: Qualification
+
+on:
+  pull_request:
+
+jobs:
+  qualification:
+    name: 🐍
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v5
+      - run: uv tool install tox --with tox-uv
+      - run: tox
+      - name: Qualification result
+        run: echo "Qualification completed successfully."
