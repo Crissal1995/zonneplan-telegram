@@ -32,3 +32,21 @@ ignore = [
     "COM812", # Comma rule conflicting with `ruff format`
     "D", # Docstring rules
 ]
+
+[tool.tox.env.lint]
+description = "Run linters"
+skip_install = true
+deps = ["ruff"]
+commands = [["ruff", "check"]]
+
+[tool.tox.env.format]
+description = "Run formatter"
+skip_install = true
+deps = ["ruff"]
+commands = [["ruff", "format", "--check"]]
+
+[tool.tox.env.type]
+description = "Run type checker"
+skip_install = true
+deps = ["ty"]
+commands = [["ty", "check"]]
