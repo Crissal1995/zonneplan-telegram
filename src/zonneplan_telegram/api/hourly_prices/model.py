@@ -1,13 +1,19 @@
 import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
+
+PriceEntry = dict[Literal["amount"], float]
 
 
 class PriceItem(BaseModel):
     start_date: datetime.datetime
     end_date: datetime.datetime
-    price_tax_included: float
+    price_tax_included: PriceEntry
+
+    @property
+    def price(self) -> float:
+        return self.price_tax_included["amount"]
 
 
 class APIResponse(BaseModel):
@@ -28,6 +34,6 @@ class APIResponse(BaseModel):
         for price_item in self.prices:
             start_time = price_item.start_date.strftime("%Y-%m-%d %H:%M")
             end_time = price_item.end_date.strftime("%Y-%m-%d %H:%M")
-            price = price_item.price_tax_included
+            price = price_item.price
             message_lines.append(f"{start_time} - {end_time}: €{price:.2f}")
         return "\n".join(message_lines)

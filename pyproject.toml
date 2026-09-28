@@ -33,20 +33,28 @@ ignore = [
     "D", # Docstring rules
 ]
 
+[tool.tox]
+env_list = ["lint", "format", "type"]
+
 [tool.tox.env.lint]
 description = "Run linters"
-skip_install = true
 deps = ["ruff"]
 commands = [["ruff", "check"]]
 
 [tool.tox.env.format]
 description = "Run formatter"
-skip_install = true
 deps = ["ruff"]
 commands = [["ruff", "format", "--check"]]
 
 [tool.tox.env.type]
 description = "Run type checker"
-skip_install = true
 deps = ["ty"]
 commands = [["ty", "check"]]
+
+[tool.tox.env.fix]
+description = "Fix issues"
+deps = ["ruff", "ty"]
+commands = [
+    ["ruff", "format"],
+    ["ruff", "check", "--fix"],
+]
