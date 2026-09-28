@@ -78,12 +78,14 @@ class APIResponse(BaseModel):
             prices = [x.price for x in items]
             return min(prices), max(prices), sum(prices) / len(prices)
 
-        # Find current price based on active quarter-hour interval (local time comparison)
+        # Find current price based on active hour interval (local time comparison)
         current_price = next(
             (
                 item.price_cents
                 for item in self.prices
-                if item.start_date.astimezone() <= now_local < item.end_date.astimezone()
+                if item.start_date.astimezone()
+                <= now_local
+                < item.end_date.astimezone()
             ),
             None,
         )
