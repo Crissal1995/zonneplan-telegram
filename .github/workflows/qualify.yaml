@@ -15,4 +15,4 @@ jobs:
           python-version: "3.14"
       - uses: astral-sh/setup-uv@v5
       - run: uv tool install tox --with tox-uv
-      - run: tox run
+      - run: tox
