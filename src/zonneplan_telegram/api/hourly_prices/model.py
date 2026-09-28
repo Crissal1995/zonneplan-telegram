@@ -18,6 +18,16 @@ class APIResponse(BaseModel):
         try:
             raw_prices = json_data["data"]["chart"]["series"]["prices"]
         except KeyError:
-            raise ValueError("Invalid JSON structure!")
+            msg = "Invalid JSON structure!"
+            raise ValueError(msg) from None
         else:
             return cls(prices=[PriceItem.model_validate(item) for item in raw_prices])
+
+    def as_markdown(self) -> str:
+        message_lines = ["*Zonneplan Hourly Prices:*"]
+        for price_item in self.prices:
+            start_time = price_item.start_date.strftime("%Y-%m-%d %H:%M")
+            end_time = price_item.end_date.strftime("%Y-%m-%d %H:%M")
+            price = price_item.price_tax_included
+            message_lines.append(f"{start_time} - {end_time}: €{price:.2f}")
+        return "\n".join(message_lines)

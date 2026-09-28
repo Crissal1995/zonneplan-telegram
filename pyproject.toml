@@ -14,3 +14,14 @@ dev = [
     "ruff>=0.16.9",
     "ty>=0.0.84",
 ]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "CPY", # Copyright rules
+    "COM812", # Comma rule conflicting with `ruff format`
+    "D", # Docstring rules
+]

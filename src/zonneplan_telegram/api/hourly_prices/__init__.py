@@ -1,9 +1,7 @@
-import datetime
-
 import requests
 
 from zonneplan_telegram.api import API_URL as _BASE_API_URL
-from zonneplan_telegram.api.hourly_prices.model import APIResponse, PriceItem
+from zonneplan_telegram.api.hourly_prices.model import APIResponse
 
 API_URL = f"{_BASE_API_URL}/consumer-prices/charts/electricity-hourly"
 
