@@ -11,6 +11,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    env:
+      PR_BRANCH: automated-data-update
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,6 +25,15 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           UV_FROZEN: 1
           UV_NO_DEV: 1
+      - name: Close existing pull requests on the same branch
+        run: |
+          gh pr list --head ${{ env.PR_BRANCH }} --state open --json number --jq '.[].number' |
+            while read -r number; do
+              echo "Closing PR #$number"
+              gh pr close "$number" --delete-branch
+            done
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
       - name: Create Pull Request for Data Updates
         uses: peter-evans/create-pull-request@v8.1.1
         id: pr
@@ -30,7 +41,7 @@ jobs:
           commit-message: "chore(data): update price history"
           title: "chore(data): Auto-update Zonneplan price history"
           body: "Automatic update of prices history."
-          branch: automated-data-update
+          branch: ${{ env.PR_BRANCH }}
           delete-branch: true
       - name: Approve pull request
         run: gh pr review ${{ steps.pr.outputs.pull-request-number }} --approve --body "${{ env.COMMENT }}"
