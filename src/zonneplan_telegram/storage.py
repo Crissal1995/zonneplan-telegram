@@ -41,7 +41,10 @@ class PriceStorage:
             return DayHistory.model_validate({})
 
     def save_prices(self, prices: Prices) -> None:
-        """Suddivide i prezzi per giorno e salva/aggiorna un file JSON separato per ciascun giorno."""
+        """
+        Split the prices by day and save/update a separate JSON file for each day.
+        Skips existing entries to avoid overwriting them.
+        """
         # Raggruppa i prezzi per data locale (YYYY-MM-DD)
         prices_by_day: dict[str, Prices] = {}
         for item in prices:
@@ -50,6 +53,11 @@ class PriceStorage:
 
         # Salva ogni giorno nel suo file dedicato
         for day_str, day_prices in prices_by_day.items():
+            file_path = self._get_file_path(day_str)
+            if file_path.exists():
+                logger.info(f"File for {day_str} already exists. Skipping.")
+                continue
+
             day_history = self.load_day(day_str)
 
             for item in day_prices:
@@ -60,6 +68,5 @@ class PriceStorage:
                     amount=item.price_tax_included["amount"],
                 )
 
-            file_path = self._get_file_path(day_str)
             file_path.write_text(day_history.model_dump_json(indent=2), encoding="utf-8")
-            logger.info(f"Saved/Updated history for {day_str} at {file_path}")
+            logger.info(f"Saved history for {day_str} at {file_path}")
