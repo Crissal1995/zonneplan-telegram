@@ -7,7 +7,7 @@ from pydantic import BaseModel
 PriceEntry = dict[Literal["amount"], float]
 
 
-class PriceItem(BaseModel):
+class Price(BaseModel):
     start_date: datetime.datetime
     end_date: datetime.datetime
     price_tax_included: PriceEntry
@@ -15,20 +15,23 @@ class PriceItem(BaseModel):
     @property
     def price_eur(self) -> float:
         """
-        Returns the price of the time span in EUR.
+        Returns the price of the time span in EUR, e.g. 0.3012 EUR/kWh.
         """
         return self.price_tax_included["amount"] * 10e-8
 
     @property
     def price_cents(self) -> float:
         """
-        Returns the price of the time span in cents.
+        Returns the price of the time span in EUR cents, e.g. 30.12 ct/kWh.
         """
         return self.price_tax_included["amount"] * 10e-6
 
 
+Prices = list[Price]
+
+
 class APIResponse(BaseModel):
-    prices: list[PriceItem]
+    prices: Prices
 
     @classmethod
     def from_raw_json(cls, json_data: dict[str, Any]) -> "APIResponse":
@@ -38,7 +41,32 @@ class APIResponse(BaseModel):
             msg = "Invalid JSON structure!"
             raise ValueError(msg) from None
         else:
-            return cls(prices=[PriceItem.model_validate(item) for item in raw_prices])
+            return cls(prices=[Price.model_validate(item) for item in raw_prices])
+
+    def get_current_price(self) -> Price | None:
+        """
+        Returns the current price in EUR cents, or None if no price is available.
+        """
+        now = datetime.datetime.now().astimezone()
+        for item in self.prices:
+            if item.start_date.astimezone() <= now < item.end_date.astimezone():
+                return item
+        return None
+
+    def get_today_prices(self) -> Prices:
+        """
+        Returns a list of Price objects for today, or an empty list if no prices are available.
+        """
+        now = datetime.datetime.now().astimezone()
+        return [item for item in self.prices if item.start_date.astimezone().date() == now.date()]
+
+    def get_tomorrow_prices(self) -> Prices:
+        """
+        Returns a list of Price objects for tomorrow, or an empty list if no prices are available.
+        """
+        now = datetime.datetime.now().astimezone()
+        tomorrow = now + datetime.timedelta(days=1)
+        return [item for item in self.prices if item.start_date.astimezone().date() == tomorrow.date()]
 
     def as_markdown(self) -> str:
         class FormattedItem(NamedTuple):
@@ -47,7 +75,7 @@ class APIResponse(BaseModel):
             hour_range: str
             price: float
 
-        # 1. Group and format items by day (YYYY-MM-DD)
+        # Group and format items by day (YYYY-MM-DD)
         days_dict: dict[str, list[FormattedItem]] = defaultdict(list)
 
         for item in self.prices:
@@ -79,25 +107,19 @@ class APIResponse(BaseModel):
             return min(prices), max(prices), sum(prices) / len(prices)
 
         # Find current price based on active hour interval (local time comparison)
-        current_price = next(
-            (
-                item.price_cents
-                for item in self.prices
-                if item.start_date.astimezone()
-                <= now_local
-                < item.end_date.astimezone()
-            ),
-            None,
-        )
+        current_price = self.get_current_price()
 
         # Fallback to the closest available item if exact match fails
         if current_price is None and self.prices:
-            current_price = self.prices[-1].price_cents
+            current_price = self.prices[-1]
+
+        if current_price is None:
+            return "⚡ **Zonneplan - Prezzi Energia** ⚡\n\n• *Dati non disponibili*"
 
         # Build Message Header
         message_lines = [
             "⚡ **Zonneplan - Prezzi Energia** ⚡",
-            f"💡 *Tariffa attuale:* `{current_price:.2f} ct/kWh`\n",
+            f"💡 *Tariffa attuale:* `{current_price.price_cents:.2f} ct/kWh`\n",
         ]
 
         # --- TODAY SECTION ---
@@ -106,17 +128,11 @@ class APIResponse(BaseModel):
             message_lines.extend(
                 [
                     f"📅 **Oggi ({today_key})**",
-                    (
-                        f"• Min: `{t_min:.2f} ct/kWh`\n"
-                        f"• Max: `{t_max:.2f} ct/kWh`\n"
-                        f"• Media: `{t_avg:.2f} ct/kWh`\n"
-                    ),
+                    (f"• Min: `{t_min:.2f} ct/kWh`\n• Max: `{t_max:.2f} ct/kWh`\n• Media: `{t_avg:.2f} ct/kWh`\n"),
                 ]
             )
         else:
-            message_lines.extend(
-                [f"📅 **Oggi ({today_key})**", "• *Dati non disponibili*\n"]
-            )
+            message_lines.extend([f"📅 **Oggi ({today_key})**", "• *Dati non disponibili*\n"])
 
         # --- TOMORROW SECTION ---
         if tomorrow_items:
@@ -124,11 +140,7 @@ class APIResponse(BaseModel):
             message_lines.extend(
                 [
                     f"📅 **Domani ({tomorrow_key})**",
-                    (
-                        f"• Min: `{tm_min:.2f} ct/kWh`\n"
-                        f"• Max: `{tm_max:.2f} ct/kWh`\n"
-                        f"• Media: `{tm_avg:.2f} ct/kWh`\n"
-                    ),
+                    (f"• Min: `{tm_min:.2f} ct/kWh`\n• Max: `{tm_max:.2f} ct/kWh`\n• Media: `{tm_avg:.2f} ct/kWh`\n"),
                 ]
             )
         else:
