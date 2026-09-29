@@ -4,6 +4,9 @@ name: Send Telegram message
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   run-bot:
     name: ✈️
@@ -20,3 +23,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           UV_FROZEN: 1
           UV_NO_DEV: 1
+      - name: Commit and push new data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No new data to commit."
+          else
+            git commit -m "chore(data): add price data for $(date -u +%F)"
+            git push
+          fi
