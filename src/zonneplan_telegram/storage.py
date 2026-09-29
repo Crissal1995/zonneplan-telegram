@@ -6,7 +6,7 @@ from pydantic import BaseModel, RootModel
 
 from zonneplan_telegram.api.hourly_prices.model import Prices
 
-DEFAULT_STORAGE_PATH = Path("data/history.json")
+DEFAULT_STORAGE_DIR = Path("data")
 
 
 class HistoryEntry(BaseModel):
@@ -15,39 +15,51 @@ class HistoryEntry(BaseModel):
     amount: float
 
 
-class History(RootModel):
+class DayHistory(RootModel):
     root: dict[str, HistoryEntry]
 
 
 class PriceStorage:
-    def __init__(self, storage_path: str | Path = DEFAULT_STORAGE_PATH) -> None:
-        self.storage_path = Path(storage_path)
-        # Ensure the parent directory exists
-        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, storage_dir: str | Path = DEFAULT_STORAGE_DIR) -> None:
+        self.storage_dir = Path(storage_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
 
-    def load_history(self) -> History:
-        """Carica lo storico esistente dal file JSON."""
-        if not self.storage_path.exists():
-            return History.model_validate({})
+    def _get_file_path(self, date_str: str) -> Path:
+        """Restituisce il percorso del file per una specifica data (es. data/2026-09-29.json)"""
+        return self.storage_dir / f"{date_str}.json"
+
+    def load_day(self, date_str: str) -> DayHistory:
+        """Carica lo storico di una specifica giornata."""
+        file_path = self._get_file_path(date_str)
+        if not file_path.exists():
+            return DayHistory.model_validate({})
         try:
-            return History.model_validate(json.load(self.storage_path.open(encoding="utf-8")))
+            return DayHistory.model_validate(json.load(file_path.open(encoding="utf-8")))
         except (json.JSONDecodeError, OSError) as error:
-            logger.error(f"Error while loading the JSON at '{self.storage_path}'. Returning empty history.")
+            logger.error(f"Error while loading JSON at '{file_path}'. Returning empty history.")
             logger.warning(f"Error details: {error}", exc_info=True)
-            return History.model_validate({})
+            return DayHistory.model_validate({})
 
     def save_prices(self, prices: Prices) -> None:
-        """Store the given list of Price objects into the JSON file, updating existing entries."""
-        history = self.load_history()
-        history_dict = history.model_dump()
-
+        """Suddivide i prezzi per giorno e salva/aggiorna un file JSON separato per ciascun giorno."""
+        # Raggruppa i prezzi per data locale (YYYY-MM-DD)
+        prices_by_day: dict[str, Prices] = {}
         for item in prices:
-            key = item.start_date.isoformat()
-            history_dict[key] = {
-                "start_date": item.start_date.isoformat(),
-                "end_date": item.end_date.isoformat(),
-                "amount": item.price_tax_included["amount"],
-            }
+            day_str = item.start_date.astimezone().strftime("%Y-%m-%d")
+            prices_by_day.setdefault(day_str, []).append(item)
 
-        # Write the updated history back to the JSON file
-        self.storage_path.write_text(json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8")
+        # Salva ogni giorno nel suo file dedicato
+        for day_str, day_prices in prices_by_day.items():
+            day_history = self.load_day(day_str)
+
+            for item in day_prices:
+                key = item.start_date.isoformat()
+                day_history.root[key] = HistoryEntry(
+                    start_date=item.start_date.isoformat(),
+                    end_date=item.end_date.isoformat(),
+                    amount=item.price_tax_included["amount"],
+                )
+
+            file_path = self._get_file_path(day_str)
+            file_path.write_text(day_history.model_dump_json(indent=2), encoding="utf-8")
+            logger.info(f"Saved/Updated history for {day_str} at {file_path}")
