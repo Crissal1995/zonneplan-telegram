@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "zonneplan-telegram"
 version = "0.1.0"
-description = "Add your description here"
+description = "Fetch Zonneplan hourly electricity prices, report them to Telegram, and archive the price history as daily JSON files"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
