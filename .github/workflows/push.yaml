@@ -37,7 +37,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT }}
           COMMENT: "✨ _This pull request has been automatically approved._"
-      - name: Enable auto-merge
-        run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --squash --auto
+      - name: Force merge
+        run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --squash --admin
         env:
           GH_TOKEN: ${{ secrets.PAT }}
