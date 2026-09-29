@@ -33,7 +33,7 @@ jobs:
           branch: automated-data-update
           delete-branch: true
       - name: Approve pull request
-        run: gh pr review ${{ steps.pr.outputs.pull-request-number }} --approve --body ${{ env.COMMENT }}
+        run: gh pr review ${{ steps.pr.outputs.pull-request-number }} --approve --body "${{ env.COMMENT }}"
         env:
           GH_TOKEN: ${{ secrets.PAT }}
           COMMENT: "✨ _This pull request has been automatically approved._"
