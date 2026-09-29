@@ -11,32 +11,57 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    env:
+      PR_BRANCH: automated-data-update
+      WORKFLOW_RUN: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
       - uses: astral-sh/setup-uv@v5
-      - run: uv run zonneplan_telegram
+      - name: Run bot
+        run: uv run zonneplan_telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           UV_FROZEN: 1
           UV_NO_DEV: 1
+      - name: Close existing pull requests on the same branch
+        run: |
+          gh pr list --head ${{ env.PR_BRANCH }} --state open --json number --jq '.[].number' |
+            while read -r number; do
+              echo "Closing PR #$number because a new one will be created."
+              gh pr close "$number" --comment "${{ env.COMMENT }}"
+            done
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+          COMMENT: >-
+            ✨ _This pull request has been automatically closed because a new one has been created._
+
+            [Workflow run](${{ env.WORKFLOW_RUN }}).
       - name: Create Pull Request for Data Updates
-        uses: peter-evans/create-pull-request@v6
+        # The output of this step will be used to get the pull request number for approval and merging.
+        # In case no data updates are found, the step will not create a pull request and the output will be empty.
+        uses: peter-evans/create-pull-request@v8.1.1
+        id: pr
         with:
           commit-message: "chore(data): update price history"
           title: "chore(data): Auto-update Zonneplan price history"
           body: "Automatic update of prices history."
-          branch: automated-data-update
+          branch: ${{ env.PR_BRANCH }}
           delete-branch: true
       - name: Approve pull request
-        run: gh pr review --approve --body ${{ env.COMMENT }}
+        if: steps.pr.outputs.pull-request-number != ''
+        run: gh pr review ${{ steps.pr.outputs.pull-request-number }} --approve --body "${{ env.COMMENT }}"
         env:
           GH_TOKEN: ${{ secrets.PAT }}
-          COMMENT: "_This pull request has been automatically approved._"
-      - name: Enable auto-merge
-        run: gh pr merge --squash --auto
+          COMMENT: >-
+            ✨ _This pull request has been automatically approved._
+
+            [Workflow run](${{ env.WORKFLOW_RUN }}).
+      - name: Force merge
+        if: steps.pr.outputs.pull-request-number != ''
+        run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --squash --admin
         env:
           GH_TOKEN: ${{ secrets.PAT }}
