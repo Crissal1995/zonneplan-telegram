@@ -60,4 +60,5 @@ deps = ["ruff", "ty"]
 commands = [
     ["ruff", "format"],
     ["ruff", "check", "--fix"],
+    ["ty", "check", "--fix"],
 ]
