@@ -50,6 +50,7 @@ jobs:
           title: "chore(data): Auto-update Zonneplan price history"
           body: "Automatic update of prices history."
           branch: ${{ env.PR_BRANCH }}
+          base: main
           delete-branch: true
       - name: Approve pull request
         if: steps.pr.outputs.pull-request-number != ''
