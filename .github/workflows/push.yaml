@@ -40,6 +40,8 @@ jobs:
 
             [Workflow run](${{ env.WORKFLOW_RUN }}).
       - name: Create Pull Request for Data Updates
+        # The output of this step will be used to get the pull request number for approval and merging.
+        # In case no data updates are found, the step will not create a pull request and the output will be empty.
         uses: peter-evans/create-pull-request@v8.1.1
         id: pr
         with:
@@ -49,6 +51,7 @@ jobs:
           branch: ${{ env.PR_BRANCH }}
           delete-branch: true
       - name: Approve pull request
+        if: steps.pr.outputs.pull-request-number != ''
         run: gh pr review ${{ steps.pr.outputs.pull-request-number }} --approve --body "${{ env.COMMENT }}"
         env:
           GH_TOKEN: ${{ secrets.PAT }}
@@ -57,6 +60,7 @@ jobs:
 
             [Workflow run](${{ env.WORKFLOW_RUN }}).
       - name: Force merge
+        if: steps.pr.outputs.pull-request-number != ''
         run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --squash --admin
         env:
           GH_TOKEN: ${{ secrets.PAT }}
