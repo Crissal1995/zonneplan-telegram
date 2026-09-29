@@ -30,7 +30,7 @@ jobs:
           gh pr list --head ${{ env.PR_BRANCH }} --state open --json number --jq '.[].number' |
             while read -r number; do
               echo "Closing PR #$number"
-              gh pr close "$number" --delete-branch
+              gh pr close "$number"
             done
         env:
           GH_TOKEN: ${{ secrets.PAT }}
