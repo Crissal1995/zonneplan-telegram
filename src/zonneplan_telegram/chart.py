@@ -37,7 +37,8 @@ def generate_zonneplan_bar_chart(prices: Prices, output_path: str = "chart.png")
     fig, ax = plt.subplots(figsize=(12, 6), dpi=200)
 
     # Disegna il grafico a barre
-    ax.bar(times, values, width=0.035, color=colors, edgecolor="none")
+    numeric_times = mdates.date2num(times)
+    ax.bar(numeric_times, values, width=0.035, color=colors, edgecolor="none")  # ignore[invalid-argument-type]
 
     ax.yaxis.set_major_locator(ticker.MultipleLocator(5))
 
