@@ -13,6 +13,7 @@ jobs:
       pull-requests: write
     env:
       PR_BRANCH: automated-data-update
+      WORKFLOW_RUN: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,11 +30,15 @@ jobs:
         run: |
           gh pr list --head ${{ env.PR_BRANCH }} --state open --json number --jq '.[].number' |
             while read -r number; do
-              echo "Closing PR #$number"
-              gh pr close "$number"
+              echo "Closing PR #$number because a new one will be created."
+              gh pr close "$number" --comment "${{ env.COMMENT }}"
             done
         env:
           GH_TOKEN: ${{ secrets.PAT }}
+          COMMENT: >-
+            ✨ _This pull request has been automatically closed because a new one has been created._
+
+            [Workflow run](${{ env.WORKFLOW_RUN }}).
       - name: Create Pull Request for Data Updates
         uses: peter-evans/create-pull-request@v8.1.1
         id: pr
@@ -47,7 +52,10 @@ jobs:
         run: gh pr review ${{ steps.pr.outputs.pull-request-number }} --approve --body "${{ env.COMMENT }}"
         env:
           GH_TOKEN: ${{ secrets.PAT }}
-          COMMENT: "✨ _This pull request has been automatically approved._"
+          COMMENT: >-
+            ✨ _This pull request has been automatically approved._
+
+            [Workflow run](${{ env.WORKFLOW_RUN }}).
       - name: Force merge
         run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --squash --admin
         env:
