@@ -215,6 +215,6 @@ Base URL: `https://app-api.zonneplan.nl/api`
 
 - `data/` is resolved relative to the working directory, so run the `update-prices` CLI from the repository root.
 - `chart.py` assembles the SVG from plain strings, so neither matplotlib nor numpy is deployed and `/chart` has no heavy import to pay for on a cold start.
-- `/chart` renders today's hours only: `handle_chart` passes `APIResponse.get_today_prices()` (filtered on the local date), so the x-axis spans 00:00–23:59 and tomorrow's published prices never appear. A bar is grey once its whole hour has elapsed and green for the current hour and the future.
+- `/chart` renders today's hours only: `handle_chart` passes `APIResponse.get_today_prices()`, so the x-axis spans 00:00–23:59 and tomorrow's published prices never appear. Hours are labelled, and bars are split into grey (elapsed) and green (current hour and upcoming), in `MARKET_TIMEZONE` (`Europe/Amsterdam`) rather than in the timezone of the machine that renders the chart, so the axis stays correct on a UTC server such as Vercel. Bar tops are rounded and the cheapest and the most expensive hour print their price above the bar.
 - Telegram only renders raster images through `sendPhoto`, so `/chart` delivers the SVG with `sendDocument`: it arrives as a file that opens in the Telegram viewer instead of an inline image.
 - `/chart` writes its SVG to `/tmp`, the only writable location on Vercel.

@@ -58,13 +58,14 @@ Two entrypoints share the same modules: the webhook (`vercel.py`) and the schedu
   - FastAPI route params need `Annotated[...]` dependencies (FAST002).
   - Lazy function-level imports need `# noqa: PLC0415`.
   - Implicit string concatenation inside a collection must be parenthesized (ISC004); prefer single lines that fit in 120 chars.
-- Runtime dependencies stay minimal (`fastapi`, `loguru`, `pydantic`, `requests`). Do not add matplotlib/numpy — `chart.py` assembles the SVG from plain strings.
+- Runtime dependencies stay minimal (`fastapi`, `loguru`, `pydantic`, `requests`, `tzdata`). Do not add matplotlib/numpy — `chart.py` assembles the SVG from plain strings. `tzdata` backs `MARKET_TIMEZONE`; without it `zoneinfo` cannot resolve `Europe/Amsterdam` on platforms that ship no system tz database, such as Windows.
 
 ## Gotchas
 
 - **Vercel entrypoint** — `[tool.vercel] entrypoint = "app:app"` points at the root `app.py` shim. Vercel resolves it as a module path relative to the repo root, so it *cannot* reference `zonneplan_telegram.vercel:app` directly for this `src` layout. `app.py` prepends `src/` to `sys.path` (hence `# noqa: E402`). Keep the `vercel.json` `functions` key in sync with `app.py`.
 - **Filesystem** — Vercel is read-only except `/tmp`; `/chart` writes its SVG there. Only the GitHub Action (`cli.py`) writes to `data/`.
-- **Charts** — `/chart` renders *today's* hours only: `handle_chart` passes `APIResponse.get_today_prices()` (filtered on the local date), so the x-axis spans 00:00–23:59 and never spills into tomorrow's published prices. Telegram rejects SVG in `sendPhoto`, so charts are delivered with `sendDocument` (`send_telegram_document`). A bar is `#d0d0d0` only once its whole hour has elapsed, otherwise `#4caf50`.
+- **Chart hours** — every hour is resolved in `MARKET_TIMEZONE` (`Europe/Amsterdam`, defined in `api/hourly_prices/model.py`), never in the timezone of the host: Vercel runs in UTC, so `datetime.now().astimezone()` used to shift the labels *and* the grey/green split by the DST offset. `APIResponse.get_today_prices()` filters on the same zone.
+- **Charts** — `/chart` renders *today's* hours only (00:00–23:59), as `<path>` bars with rounded top corners. The cheapest and the most expensive bar print their value above the bar (`_extreme_labels`), and `_axis_max` adds `Y_HEADROOM_RATIO` headroom so that label stays inside the plot. Telegram rejects SVG in `sendPhoto`, so charts are delivered with `sendDocument` (`send_telegram_document`). A bar is `#d0d0d0` only once its whole hour has elapsed, otherwise `#4caf50`.
 - **Storage** — an existing day file is only rewritten when the new data has *more* entries, so recorded hours are never overwritten. `data/` resolves relative to the working directory, so run the CLI from the repo root.
 - **Allowlist** — an empty allowlist denies everyone; `TELEGRAM_CHAT_ID` or `TELEGRAM_ALLOWED_CHAT_IDS` must be set for commands to work.
 - **Dependencies** — Vercel and CI build with uv; run `uv sync` after editing deps so `uv.lock` stays in sync.
