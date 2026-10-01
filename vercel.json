@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["arn1"],
   "functions": {
-    "src/zonneplan_telegram/vercel.py": {
+    "app.py": {
       "maxDuration": 30,
       "excludeFiles": "{data/**,.github/**,**/*.md}"
     }

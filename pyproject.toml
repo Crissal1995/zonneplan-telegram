@@ -27,7 +27,7 @@ zonneplan_telegram = "zonneplan_telegram.bot:main"
 set-webhook = "zonneplan_telegram.telegram.set_webhook:main"
 
 [tool.vercel]
-entrypoint = "zonneplan_telegram.vercel:app"
+entrypoint = "app:app"
 
 [tool.ruff]
 line-length = 120

@@ -19,7 +19,7 @@ Matching is case-insensitive and tolerates the `@botusername` suffix, so `/price
 
 ```mermaid
 flowchart LR
-    T["Telegram"] -->|"POST /api/webhook"| V["vercel.py<br/>FastAPI app"]
+    T["Telegram"] -->|"POST /api/webhook"| V["app.py → vercel.py<br/>FastAPI app"]
     V --> B["commands.py"]
     A["Zonneplan API<br/>consumer-prices/charts"] -->|hourly prices| B
     B -->|Markdown summary| E["telegram/<br/>sendMessage"]
@@ -29,7 +29,7 @@ flowchart LR
 
 Two entrypoints share the same building blocks.
 
-**`vercel.py` — the webhook (`POST /api/webhook`)**
+**`app.py` → `vercel.py` — the webhook (`POST /api/webhook`)**
 
 1. **Verify** — the `X-Telegram-Bot-Api-Secret-Token` header is compared with `TELEGRAM_WEBHOOK_SECRET`, and updates from chats outside the allowlist are dropped.
 2. **Dispatch** — `commands.py` maps the command to a handler that fetches the prices and replies in the chat that asked.
@@ -81,7 +81,7 @@ Both `send_telegram_message()` and `send_telegram_document()` also accept explic
 
 ## Deploying to Vercel
 
-The repository needs no build step: Vercel detects the FastAPI app from the `fastapi` dependency in `pyproject.toml`, and `[tool.vercel] entrypoint` in the same file points at `zonneplan_telegram.vercel:app`. Steps that have to be done once, outside the repository:
+The repository needs no build step: Vercel detects the FastAPI app from the `fastapi` dependency in `pyproject.toml`, and `[tool.vercel] entrypoint = "app:app"` points at the root-level `app.py`, which re-exports the FastAPI instance from the `src` layout (Vercel resolves that setting as a path relative to the project root, so it cannot reference `src/zonneplan_telegram/vercel.py` directly). Steps that have to be done once, outside the repository:
 
 1. **Import the project.** In the [Vercel dashboard](https://vercel.com/new), import the GitHub repository. Leave *Root Directory* at the repository root and keep the detected **FastAPI** framework preset.
 2. **Add environment variables.** In *Project Settings → Environment Variables*, add `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_ALLOWED_CHAT_IDS` and `TELEGRAM_WEBHOOK_SECRET` for the Production (and optionally Preview) environment.
@@ -100,7 +100,7 @@ The repository needs no build step: Vercel detects the FastAPI app from the `fas
    uv run set-webhook --delete        # remove it again
    ```
 
-`vercel.json` pins the function to the Amsterdam region (`ams1`), allows up to 30 seconds for chart rendering and keeps `data/`, `.github/` and the Markdown files out of the bundle.
+`vercel.json` pins the function to a single European region, allows up to 30 seconds for chart rendering and keeps `data/`, `.github/` and the Markdown files out of the bundle.
 
 ### What still runs on GitHub Actions
 
@@ -181,13 +181,14 @@ Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring cop
 
 ```
 .
+├── app.py                        # Vercel entrypoint: re-exports the FastAPI app
 ├── .github/workflows/
 │   ├── qualify.yaml              # PR quality gate (tox)
 │   └── push.yaml                 # run the bot + auto-merge data updates
 ├── data/                         # archived price history (one JSON per day)
 ├── src/zonneplan_telegram/
 │   ├── bot.py                    # scheduled CLI: fetch → archive → send
-│   ├── vercel.py                 # Vercel entrypoint: FastAPI webhook
+│   ├── vercel.py                 # FastAPI webhook application
 │   ├── commands.py               # command handlers + Telegram menu metadata
 │   ├── chart.py                  # pure-stdlib SVG bar chart
 │   ├── storage.py                # per-day JSON persistence
