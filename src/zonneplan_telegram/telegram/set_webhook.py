@@ -11,6 +11,7 @@ Requires ``TELEGRAM_BOT_TOKEN`` and, when setWebhook is protected, ``TELEGRAM_WE
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 from typing import TYPE_CHECKING
 
@@ -21,6 +22,9 @@ from zonneplan_telegram.commands import BOT_COMMANDS
 
 if TYPE_CHECKING:
     from typing import Any
+
+# Load environment variables from .env file if python-dotenv is installed
+importlib.util.find_spec("dotenv") and importlib.import_module("dotenv").load_dotenv()
 
 API_BASE_URL = "https://api.telegram.org"
 WEBHOOK_PATH = "/api/webhook"
