@@ -114,12 +114,12 @@ class APIResponse(BaseModel):
             current_price = self.prices[-1]
 
         if current_price is None:
-            return "⚡ **Zonneplan - Prezzi Energia** ⚡\n\n• *Dati non disponibili*"
+            return "⚡ **Zonneplan - Energy Prices** ⚡\n\n• *Data not available*"
 
         # Build Message Header
         message_lines = [
-            "⚡ **Zonneplan - Prezzi Energia** ⚡",
-            f"💡 *Tariffa attuale:* `{current_price.price_cents:.2f} ct/kWh`\n",
+            "⚡ **Zonneplan - Energy Prices** ⚡",
+            f"💡 *Current rate:* `{current_price.price_cents:.2f} ct/kWh`\n",
         ]
 
         # --- TODAY SECTION ---
@@ -127,29 +127,95 @@ class APIResponse(BaseModel):
             t_min, t_max, t_avg = get_day_stats(today_items)
             message_lines.extend(
                 [
-                    f"📅 **Oggi ({today_key})**",
-                    (f"• Min: `{t_min:.2f} ct/kWh`\n• Max: `{t_max:.2f} ct/kWh`\n• Media: `{t_avg:.2f} ct/kWh`\n"),
+                    f"📅 **Today ({today_key})**",
+                    (f"• Min: `{t_min:.2f} ct/kWh`\n• Max: `{t_max:.2f} ct/kWh`\n• Avg: `{t_avg:.2f} ct/kWh`\n"),
                 ]
             )
         else:
-            message_lines.extend([f"📅 **Oggi ({today_key})**", "• *Dati non disponibili*\n"])
+            message_lines.extend([f"📅 **Today ({today_key})**", "• *Data not available*\n"])
 
         # --- TOMORROW SECTION ---
         if tomorrow_items:
             tm_min, tm_max, tm_avg = get_day_stats(tomorrow_items)
             message_lines.extend(
                 [
-                    f"📅 **Domani ({tomorrow_key})**",
-                    (f"• Min: `{tm_min:.2f} ct/kWh`\n• Max: `{tm_max:.2f} ct/kWh`\n• Media: `{tm_avg:.2f} ct/kWh`\n"),
+                    f"📅 **Tomorrow ({tomorrow_key})**",
+                    (f"• Min: `{tm_min:.2f} ct/kWh`\n• Max: `{tm_max:.2f} ct/kWh`\n• Avg: `{tm_avg:.2f} ct/kWh`\n"),
                 ]
             )
         else:
             message_lines.extend(
                 [
-                    f"📅 **Domani ({tomorrow_key})**",
-                    "• *Dati non disponibili*\n",
+                    f"📅 **Tomorrow ({tomorrow_key})**",
+                    "• *Data not available*\n",
                 ]
             )
 
         message_lines.append("_Made with ❤️ by Crissal1995_")
+        return "\n".join(message_lines)
+
+    def as_price_now_markdown(self) -> str:
+        """
+        Renders the tariff of the current hour together with today's summary.
+        """
+        current_price = self.get_current_price()
+        if current_price is None:
+            return "⚡ **Zonneplan - Energy Prices** ⚡\n\n• *Current price not available.*"
+
+        now_local = datetime.datetime.now().astimezone()
+        start_local = current_price.start_date.astimezone()
+        end_local = current_price.end_date.astimezone()
+
+        message_lines = [
+            "⚡ **Zonneplan - Current price** ⚡",
+            "",
+            f"💡 *Now:* `{current_price.price_cents:.2f} ct/kWh`",
+            f"🕒 *Slot:* `{start_local:%H:%M} - {end_local:%H:%M}`",
+        ]
+
+        today_prices = self.get_today_prices()
+        if today_prices:
+            prices = [item.price_cents for item in today_prices]
+            message_lines.extend(
+                [
+                    "",
+                    f"📅 **Today ({now_local:%Y-%m-%d})**",
+                    (
+                        f"• Min: `{min(prices):.2f} ct/kWh`\n• Max: `{max(prices):.2f} ct/kWh`\n"
+                        f"• Avg: `{sum(prices) / len(prices):.2f} ct/kWh`"
+                    ),
+                ]
+            )
+
+        return "\n".join(message_lines)
+
+    def as_tomorrow_markdown(self) -> str:
+        """
+        Renders tomorrow's summary, or a notice when the prices are not published yet.
+        """
+        tomorrow_prices = self.get_tomorrow_prices()
+        tomorrow_local = datetime.datetime.now().astimezone() + datetime.timedelta(days=1)
+
+        message_lines = [
+            "⚡ **Zonneplan - Tomorrow's prices** ⚡",
+            "",
+            f"📅 **Tomorrow ({tomorrow_local:%Y-%m-%d})**",
+        ]
+
+        if not tomorrow_prices:
+            message_lines.append("• *Prices not published yet.*")
+            return "\n".join(message_lines)
+
+        prices = [item.price_cents for item in tomorrow_prices]
+        cheapest = min(tomorrow_prices, key=lambda item: item.price_cents)
+        most_expensive = max(tomorrow_prices, key=lambda item: item.price_cents)
+
+        message_lines.extend(
+            [
+                f"• Min: `{min(prices):.2f} ct/kWh` (`{cheapest.start_date.astimezone():%H:%M}`)",
+                f"• Max: `{max(prices):.2f} ct/kWh` (`{most_expensive.start_date.astimezone():%H:%M}`)",
+                f"• Avg: `{sum(prices) / len(prices):.2f} ct/kWh`",
+            ]
+        )
+
         return "\n".join(message_lines)

@@ -9,8 +9,8 @@ description = "Fetch Zonneplan hourly electricity prices, report them to Telegra
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.117.1",
     "loguru>=0.7.3",
-    "matplotlib>=3.11.2",
     "pydantic>=2.13.5",
     "requests>=2.34.2",
 ]
@@ -24,6 +24,10 @@ dev = [
 
 [project.scripts]
 zonneplan_telegram = "zonneplan_telegram.bot:main"
+set-webhook = "zonneplan_telegram.telegram.set_webhook:main"
+
+[tool.vercel]
+entrypoint = "app:app"
 
 [tool.ruff]
 line-length = 120

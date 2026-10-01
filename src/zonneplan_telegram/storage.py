@@ -29,11 +29,11 @@ class PriceStorage:
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_file_path(self, date_str: str) -> Path:
-        """Restituisce il percorso del file per una specifica data (es. data/2026-09-29.json)"""
+        """Returns the file path for a specific date (e.g. data/2026-09-29.json)."""
         return self.storage_dir / f"{date_str}.json"
 
     def load_day(self, date_str: str) -> DayHistory | None:
-        """Carica lo storico di una specifica giornata."""
+        """Loads the archived history of a single day."""
         file_path = self._get_file_path(date_str)
         if not file_path.exists():
             return None
@@ -49,13 +49,13 @@ class PriceStorage:
         Split the prices by day and save/update a separate JSON file for each day.
         Skips existing entries to avoid overwriting them.
         """
-        # Raggruppa i prezzi per data locale (YYYY-MM-DD)
+        # Group the prices by local date (YYYY-MM-DD)
         prices_by_day: dict[str, Prices] = {}
         for item in prices:
             day_str = item.start_date.astimezone().strftime("%Y-%m-%d")
             prices_by_day.setdefault(day_str, []).append(item)
 
-        # Salva ogni giorno nel suo file dedicato
+        # Save each day to its own file
         for day_str, day_prices in prices_by_day.items():
             file_path = self._get_file_path(day_str)
             original_day_history = self.load_day(day_str)
