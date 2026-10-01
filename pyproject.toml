@@ -23,7 +23,7 @@ dev = [
 ]
 
 [project.scripts]
-zonneplan_telegram = "zonneplan_telegram.bot:main"
+update-prices = "zonneplan_telegram.cli:update_prices"
 set-webhook = "zonneplan_telegram.telegram.set_webhook:main"
 
 [tool.vercel]
