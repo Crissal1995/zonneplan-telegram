@@ -19,7 +19,7 @@ def get_allowed_chat_ids() -> set[str]:
     Returns the chat ids the bot is allowed to serve.
 
     Reads the comma-separated ``TELEGRAM_ALLOWED_CHAT_IDS`` variable and falls back to the
-    single ``TELEGRAM_CHAT_ID`` used by the scheduled report.
+    single ``TELEGRAM_CHAT_ID``.
     """
     raw = os.environ.get("TELEGRAM_ALLOWED_CHAT_IDS") or os.environ.get("TELEGRAM_CHAT_ID") or ""
     return {chat_id.strip() for chat_id in raw.split(",") if chat_id.strip()}

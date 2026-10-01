@@ -7,7 +7,7 @@ Guidance for AI coding agents working in this repository.
 `zonneplan-telegram` fetches the hourly electricity prices from the Zonneplan consumer API, answers Telegram commands through a webhook, and archives the price history as one JSON file per day.
 
 - **Webhook** — `app.py` → `src/zonneplan_telegram/vercel.py` (FastAPI, `POST /api/webhook`). Answers `/priceNow`, `/priceTomorrow`, `/chart` and `/help` on demand.
-- **Scheduled CLI** — `src/zonneplan_telegram/bot.py` (`main()`). Fetches, archives to `data/` and sends the full report; run by the `push.yaml` GitHub Action, never by the webhook.
+- **Scheduled CLI** — `src/zonneplan_telegram/cli.py` (`update_prices()`). Fetches the prices and archives them to `data/`; run by the `push.yaml` GitHub Action, never by the webhook.
 
 Python >= 3.12, managed with [uv](https://docs.astral.sh/uv/).
 
@@ -15,7 +15,7 @@ Python >= 3.12, managed with [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync                     # install / refresh dependencies (uv.lock)
-uv run zonneplan_telegram   # run the scheduled CLI from the repo root
+uv run update-prices        # run the scheduled CLI from the repo root
 uv run set-webhook <url>    # register the Telegram webhook (… --info, --delete)
 
 uv tool install tox --with tox-uv
@@ -36,7 +36,7 @@ uv run ty check
 ```
 app.py                          # Vercel entrypoint: prepends src/ to sys.path, re-exports app
 src/zonneplan_telegram/
-  bot.py                        # scheduled CLI: fetch → archive → send
+  cli.py                        # scheduled CLI: fetch → archive
   vercel.py                     # FastAPI webhook application
   commands.py                   # command handlers + Telegram menu metadata
   chart.py                      # pure-stdlib SVG bar chart
@@ -46,7 +46,7 @@ src/zonneplan_telegram/
 data/                           # archived price history, one JSON file per local day
 ```
 
-Two entrypoints share the same modules: the webhook (`vercel.py`) and the scheduled CLI (`bot.py`).
+Two entrypoints share the same modules: the webhook (`vercel.py`) and the scheduled CLI (`cli.py`).
 
 ## Conventions
 
@@ -63,9 +63,9 @@ Two entrypoints share the same modules: the webhook (`vercel.py`) and the schedu
 ## Gotchas
 
 - **Vercel entrypoint** — `[tool.vercel] entrypoint = "app:app"` points at the root `app.py` shim. Vercel resolves it as a module path relative to the repo root, so it *cannot* reference `zonneplan_telegram.vercel:app` directly for this `src` layout. `app.py` prepends `src/` to `sys.path` (hence `# noqa: E402`). Keep the `vercel.json` `functions` key in sync with `app.py`.
-- **Filesystem** — Vercel is read-only except `/tmp`; `/chart` writes its SVG there. Only the GitHub Action (`bot.py`) writes to `data/`.
-- **Charts** — Telegram rejects SVG in `sendPhoto`, so charts are delivered with `sendDocument` (`send_telegram_document`). A bar is `#d0d0d0` only once its whole hour has elapsed, otherwise `#4caf50`.
-- **Storage** — an existing day file is only rewritten when the new data has *more* entries, so recorded hours are never overwritten. `data/` and `chart.svg` resolve relative to the working directory, so run the CLI from the repo root.
+- **Filesystem** — Vercel is read-only except `/tmp`; `/chart` writes its SVG there. Only the GitHub Action (`cli.py`) writes to `data/`.
+- **Charts** — `/chart` renders *today's* hours only: `handle_chart` passes `APIResponse.get_today_prices()` (filtered on the local date), so the x-axis spans 00:00–23:59 and never spills into tomorrow's published prices. Telegram rejects SVG in `sendPhoto`, so charts are delivered with `sendDocument` (`send_telegram_document`). A bar is `#d0d0d0` only once its whole hour has elapsed, otherwise `#4caf50`.
+- **Storage** — an existing day file is only rewritten when the new data has *more* entries, so recorded hours are never overwritten. `data/` resolves relative to the working directory, so run the CLI from the repo root.
 - **Allowlist** — an empty allowlist denies everyone; `TELEGRAM_CHAT_ID` or `TELEGRAM_ALLOWED_CHAT_IDS` must be set for commands to work.
 - **Dependencies** — Vercel and CI build with uv; run `uv sync` after editing deps so `uv.lock` stays in sync.
 
@@ -76,7 +76,7 @@ Read from the environment at runtime (local `.env` is loaded when `python-dotenv
 | Variable | Required | Description |
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | yes | Bot token from [@BotFather](https://t.me/BotFather) |
-| `TELEGRAM_CHAT_ID` | yes | Chat that receives the scheduled report; default allowlist |
+| `TELEGRAM_CHAT_ID` | yes | Fallback chat id for outgoing messages; also the default allowlist |
 | `TELEGRAM_ALLOWED_CHAT_IDS` | no | Comma-separated chat ids the webhook may answer |
 | `TELEGRAM_WEBHOOK_SECRET` | recommended | Echoed by Telegram in `X-Telegram-Bot-Api-Secret-Token` |
 

@@ -1,6 +1,5 @@
 import datetime
-from collections import defaultdict
-from typing import Any, Literal, NamedTuple
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -67,92 +66,6 @@ class APIResponse(BaseModel):
         now = datetime.datetime.now().astimezone()
         tomorrow = now + datetime.timedelta(days=1)
         return [item for item in self.prices if item.start_date.astimezone().date() == tomorrow.date()]
-
-    def as_markdown(self) -> str:
-        class FormattedItem(NamedTuple):
-            start_dt: datetime.datetime
-            end_dt: datetime.datetime
-            hour_range: str
-            price: float
-
-        # Group and format items by day (YYYY-MM-DD)
-        days_dict: dict[str, list[FormattedItem]] = defaultdict(list)
-
-        for item in self.prices:
-            start = item.start_date
-            end = item.end_date
-            price = item.price_cents
-
-            day_key = start.strftime("%Y-%m-%d")
-            days_dict[day_key].append(
-                FormattedItem(
-                    start_dt=start,
-                    end_dt=end,
-                    hour_range=f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}",
-                    price=price,
-                )
-            )
-
-        # Identify Today and Tomorrow based on local timezone
-        now_local = datetime.datetime.now().astimezone()
-        today_key = now_local.strftime("%Y-%m-%d")
-        tomorrow_key = (now_local + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-
-        today_items = days_dict.get(today_key, [])
-        tomorrow_items = days_dict.get(tomorrow_key, [])
-
-        # Helper function to compute stats for a day
-        def get_day_stats(items: list[FormattedItem]) -> tuple[float, float, float]:
-            prices = [x.price for x in items]
-            return min(prices), max(prices), sum(prices) / len(prices)
-
-        # Find current price based on active hour interval (local time comparison)
-        current_price = self.get_current_price()
-
-        # Fallback to the closest available item if exact match fails
-        if current_price is None and self.prices:
-            current_price = self.prices[-1]
-
-        if current_price is None:
-            return "⚡ **Zonneplan - Energy Prices** ⚡\n\n• *Data not available*"
-
-        # Build Message Header
-        message_lines = [
-            "⚡ **Zonneplan - Energy Prices** ⚡",
-            f"💡 *Current rate:* `{current_price.price_cents:.2f} ct/kWh`\n",
-        ]
-
-        # --- TODAY SECTION ---
-        if today_items:
-            t_min, t_max, t_avg = get_day_stats(today_items)
-            message_lines.extend(
-                [
-                    f"📅 **Today ({today_key})**",
-                    (f"• Min: `{t_min:.2f} ct/kWh`\n• Max: `{t_max:.2f} ct/kWh`\n• Avg: `{t_avg:.2f} ct/kWh`\n"),
-                ]
-            )
-        else:
-            message_lines.extend([f"📅 **Today ({today_key})**", "• *Data not available*\n"])
-
-        # --- TOMORROW SECTION ---
-        if tomorrow_items:
-            tm_min, tm_max, tm_avg = get_day_stats(tomorrow_items)
-            message_lines.extend(
-                [
-                    f"📅 **Tomorrow ({tomorrow_key})**",
-                    (f"• Min: `{tm_min:.2f} ct/kWh`\n• Max: `{tm_max:.2f} ct/kWh`\n• Avg: `{tm_avg:.2f} ct/kWh`\n"),
-                ]
-            )
-        else:
-            message_lines.extend(
-                [
-                    f"📅 **Tomorrow ({tomorrow_key})**",
-                    "• *Data not available*\n",
-                ]
-            )
-
-        message_lines.append("_Made with ❤️ by Crissal1995_")
-        return "\n".join(message_lines)
 
     def as_price_now_markdown(self) -> str:
         """
