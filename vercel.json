@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["ams1"],
+  "functions": {
+    "src/zonneplan_telegram/vercel.py": {
+      "maxDuration": 30,
+      "excludeFiles": "{data/**,.github/**,**/*.md}"
+    }
+  }
+}

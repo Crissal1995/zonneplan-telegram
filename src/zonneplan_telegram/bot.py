@@ -7,7 +7,7 @@ from zonneplan_telegram.api.hourly_prices import (
 )
 from zonneplan_telegram.chart import generate_zonneplan_bar_chart
 from zonneplan_telegram.storage import PriceStorage
-from zonneplan_telegram.telegram import send_telegram_message, send_telegram_photo
+from zonneplan_telegram.telegram import send_telegram_document, send_telegram_message
 
 # Load environment variables from .env file if python-dotenv is installed
 importlib.util.find_spec("dotenv") and importlib.import_module("dotenv").load_dotenv()
@@ -26,10 +26,10 @@ def main() -> None:
 
     send_telegram_message(markdown_msg)
 
-    generate_zonneplan_bar_chart(response.prices, output_path="chart.png")
-    send_telegram_photo(
-        photo_path="chart.png",
-        caption="Grafico dei prezzi orari di Zonneplan",
+    generate_zonneplan_bar_chart(response.prices, output_path="chart.svg")
+    send_telegram_document(
+        document_path="chart.svg",
+        caption="Zonneplan hourly price chart",
     )
 
 
