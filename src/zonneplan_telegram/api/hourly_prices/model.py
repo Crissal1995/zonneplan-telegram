@@ -1,9 +1,20 @@
 import datetime
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
+# Zonneplan publishes the Dutch day-ahead prices, so every "local" conversion resolves in the
+# market timezone instead of the host timezone: Vercel runs in UTC, which used to shift the
+# chart hours and the day boundaries by the DST offset.
+MARKET_TIMEZONE = ZoneInfo("Europe/Amsterdam")
+
 PriceEntry = dict[Literal["amount"], float]
+
+
+def _now() -> datetime.datetime:
+    """Returns the current instant in the price market timezone."""
+    return datetime.datetime.now(MARKET_TIMEZONE)
 
 
 class Price(BaseModel):
@@ -46,9 +57,9 @@ class APIResponse(BaseModel):
         """
         Returns the current price in EUR cents, or None if no price is available.
         """
-        now = datetime.datetime.now().astimezone()
+        now = _now()
         for item in self.prices:
-            if item.start_date.astimezone() <= now < item.end_date.astimezone():
+            if item.start_date.astimezone(MARKET_TIMEZONE) <= now < item.end_date.astimezone(MARKET_TIMEZONE):
                 return item
         return None
 
@@ -56,16 +67,15 @@ class APIResponse(BaseModel):
         """
         Returns a list of Price objects for today, or an empty list if no prices are available.
         """
-        now = datetime.datetime.now().astimezone()
-        return [item for item in self.prices if item.start_date.astimezone().date() == now.date()]
+        today = _now().date()
+        return [item for item in self.prices if item.start_date.astimezone(MARKET_TIMEZONE).date() == today]
 
     def get_tomorrow_prices(self) -> Prices:
         """
         Returns a list of Price objects for tomorrow, or an empty list if no prices are available.
         """
-        now = datetime.datetime.now().astimezone()
-        tomorrow = now + datetime.timedelta(days=1)
-        return [item for item in self.prices if item.start_date.astimezone().date() == tomorrow.date()]
+        tomorrow = (_now() + datetime.timedelta(days=1)).date()
+        return [item for item in self.prices if item.start_date.astimezone(MARKET_TIMEZONE).date() == tomorrow]
 
     def as_price_now_markdown(self) -> str:
         """
@@ -75,9 +85,9 @@ class APIResponse(BaseModel):
         if current_price is None:
             return "⚡ **Zonneplan - Energy Prices** ⚡\n\n• *Current price not available.*"
 
-        now_local = datetime.datetime.now().astimezone()
-        start_local = current_price.start_date.astimezone()
-        end_local = current_price.end_date.astimezone()
+        now_local = _now()
+        start_local = current_price.start_date.astimezone(MARKET_TIMEZONE)
+        end_local = current_price.end_date.astimezone(MARKET_TIMEZONE)
 
         message_lines = [
             "⚡ **Zonneplan - Current price** ⚡",
@@ -107,7 +117,7 @@ class APIResponse(BaseModel):
         Renders tomorrow's summary, or a notice when the prices are not published yet.
         """
         tomorrow_prices = self.get_tomorrow_prices()
-        tomorrow_local = datetime.datetime.now().astimezone() + datetime.timedelta(days=1)
+        tomorrow_local = _now() + datetime.timedelta(days=1)
 
         message_lines = [
             "⚡ **Zonneplan - Tomorrow's prices** ⚡",
@@ -125,8 +135,8 @@ class APIResponse(BaseModel):
 
         message_lines.extend(
             [
-                f"• Min: `{min(prices):.2f} ct/kWh` (`{cheapest.start_date.astimezone():%H:%M}`)",
-                f"• Max: `{max(prices):.2f} ct/kWh` (`{most_expensive.start_date.astimezone():%H:%M}`)",
+                f"• Min: `{min(prices):.2f} ct/kWh` (`{cheapest.start_date.astimezone(MARKET_TIMEZONE):%H:%M}`)",
+                f"• Max: `{max(prices):.2f} ct/kWh` (`{most_expensive.start_date.astimezone(MARKET_TIMEZONE):%H:%M}`)",
                 f"• Avg: `{sum(prices) / len(prices):.2f} ct/kWh`",
             ]
         )
