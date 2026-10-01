@@ -1,11 +1,11 @@
 ---
-name: Send Telegram message
+name: Update price history
 
 on:
   workflow_dispatch:
 
 jobs:
-  run-bot:
+  update-prices:
     name: ✈️
     runs-on: ubuntu-latest
     permissions:

@@ -70,10 +70,10 @@ def handle_price_tomorrow(chat_id: int) -> None:
 
 
 def handle_chart(chat_id: int) -> None:
-    """Renders the hourly price chart and sends it as an SVG document."""
+    """Renders today's hourly price chart (00:00-23:59) and sends it as an SVG document."""
     response = get_zonneplan_hourly_prices()
     output_path = Path(tempfile.gettempdir()) / f"zonneplan-chart-{chat_id}.svg"
-    generate_zonneplan_bar_chart(response.prices, output_path=str(output_path))
+    generate_zonneplan_bar_chart(response.get_today_prices(), output_path=str(output_path))
     send_telegram_document(
         document_path=output_path,
         caption="Zonneplan hourly price chart",

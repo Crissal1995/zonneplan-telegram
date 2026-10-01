@@ -15,10 +15,6 @@ def update_prices() -> None:
     response = get_zonneplan_hourly_prices()
     logger.info("Fetched Zonneplan hourly prices successfully.")
     logger.debug("Response data: {}", response)
-
-    markdown_msg = response.as_markdown()
-    logger.debug("Response as markdown: {}", markdown_msg)
-
     storage = PriceStorage()
     storage.save_prices(response.prices)
 

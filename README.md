@@ -10,7 +10,7 @@ The bot is deployed as a [Vercel Function](https://vercel.com/docs/functions) th
 | --- | --- |
 | `/priceNow` | Tariff of the current hour, plus today's min / max / average |
 | `/priceTomorrow` | Tomorrow's min / max / average with the hours of the cheapest and most expensive slot, or a notice while the prices are not published yet |
-| `/chart` | The Zonneplan bar chart, sent as an SVG document |
+| `/chart` | The Zonneplan bar chart for today (00:00–23:59), sent as an SVG document |
 | `/help` (and `/start`) | The list of commands |
 
 Matching is case-insensitive and tolerates the `@botusername` suffix, so `/priceNow`, `/pricenow` and `/priceNow@MyBot` all work. Updates from chats that are not in the allowlist are ignored.
@@ -34,12 +34,10 @@ Two entrypoints share the same building blocks.
 1. **Verify** — the `X-Telegram-Bot-Api-Secret-Token` header is compared with `TELEGRAM_WEBHOOK_SECRET`, and updates from chats outside the allowlist are dropped.
 2. **Dispatch** — `commands.py` maps the command to a handler that fetches the prices and replies in the chat that asked.
 
-**`bot.py` — the scheduled report (`main()`, unchanged)**
+**`cli.py` — the scheduled archiver (`update_prices()`)**
 
 1. **Fetch** — `get_zonneplan_hourly_prices()` calls `GET /api/consumer-prices/charts/electricity-hourly` and parses the payload into `APIResponse`.
 2. **Archive** — `PriceStorage.save_prices()` groups the prices by local date and writes/updates `data/YYYY-MM-DD.json`.
-3. **Notify** — `APIResponse.as_markdown()` renders the current tariff plus today's and tomorrow's min/max/average, which is sent with `sendMessage`.
-4. **Chart** — `generate_zonneplan_bar_chart()` renders a Zonneplan-style bar chart (grey bars for hours already elapsed, green for the current hour and the future) and sends it with `sendDocument`.
 
 ## Requirements
 
@@ -62,7 +60,7 @@ The credentials are read from the environment at runtime:
 | Variable | Required | Description |
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | yes | Bot token issued by [@BotFather](https://t.me/BotFather) |
-| `TELEGRAM_CHAT_ID` | yes | Chat, group or channel id that receives the scheduled report; also the default allowlist |
+| `TELEGRAM_CHAT_ID` | yes | Fallback chat id for outgoing messages; also the default allowlist |
 | `TELEGRAM_ALLOWED_CHAT_IDS` | no | Comma-separated chat ids the webhook may answer. Falls back to `TELEGRAM_CHAT_ID` when unset |
 | `TELEGRAM_WEBHOOK_SECRET` | recommended | Secret that Telegram echoes back in the `X-Telegram-Bot-Api-Secret-Token` header. When unset, every caller is accepted |
 
@@ -108,25 +106,25 @@ The Vercel filesystem is read-only apart from `/tmp`, so the webhook never write
 
 ## Usage
 
-The on-demand Telegram commands are served by the deployed Vercel Function, so register its webhook first (see [Deploying to Vercel](#deploying-to-vercel)). To reproduce what the scheduled workflow does — send the full report and archive the prices — run the CLI locally from the repository root:
+The on-demand Telegram commands are served by the deployed Vercel Function, so register its webhook first (see [Deploying to Vercel](#deploying-to-vercel)). To reproduce what the scheduled workflow does — fetch the prices and archive them to `data/` — run the CLI locally from the repository root:
 
 ```bash
-uv run zonneplan_telegram
+uv run update-prices
 ```
 
-The console script maps to `zonneplan_telegram.bot:main` (see `[project.scripts]` in `pyproject.toml`). Equivalent invocations:
+The console script maps to `zonneplan_telegram.cli:update_prices` (see `[project.scripts]` in `pyproject.toml`). Equivalent invocations:
 
 ```bash
-uv run python -m zonneplan_telegram.bot
-uv run -m zonneplan_telegram.bot   # uv's --module flag
+uv run python -m zonneplan_telegram.cli
+uv run -m zonneplan_telegram.cli   # uv's --module flag
 ```
 
-Run `uv run -m zonneplan_telegram` (without `.bot`) only imports the package: the package has no `__main__.py`.
+Run `uv run -m zonneplan_telegram` (without `.cli`) only imports the package: the package has no `__main__.py`.
 
 In CI the run is pinned and dev dependencies are excluded:
 
 ```bash
-UV_FROZEN=1 UV_NO_DEV=1 uv run zonneplan_telegram
+UV_FROZEN=1 UV_NO_DEV=1 uv run update-prices
 ```
 
 ## Data storage
@@ -173,9 +171,9 @@ Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring cop
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `qualify.yaml` | `pull_request` | Runs `tox` (lint, format check, type check) |
-| `push.yaml` | `workflow_dispatch` | Runs the bot, then commits the new data through an auto-merged pull request |
+| `push.yaml` | `workflow_dispatch` | Runs `update-prices`, then commits the new data through an auto-merged pull request |
 
-`push.yaml` needs the `PAT` secret (a token with `repo` scope; the job already declares `contents: write` and `pull-requests: write`) and the two Telegram secrets. It runs the bot, closes any still-open pull request on the `automated-data-update` branch, opens a fresh one with `peter-evans/create-pull-request`, approves and squash-merges it with `--admin`. The approval and merge steps are skipped when no data changed and therefore no pull request was created.
+`push.yaml` needs the `PAT` secret (a token with `repo` scope; the job already declares `contents: write` and `pull-requests: write`). It runs `update-prices`, closes any still-open pull request on the `automated-data-update` branch, opens a fresh one with `peter-evans/create-pull-request`, approves and squash-merges it with `--admin`. The approval and merge steps are skipped when no data changed and therefore no pull request was created.
 
 ## Project structure
 
@@ -184,10 +182,10 @@ Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring cop
 ├── app.py                        # Vercel entrypoint: re-exports the FastAPI app
 ├── .github/workflows/
 │   ├── qualify.yaml              # PR quality gate (tox)
-│   └── push.yaml                 # run the bot + auto-merge data updates
+│   └── push.yaml                 # run update-prices + auto-merge data updates
 ├── data/                         # archived price history (one JSON per day)
 ├── src/zonneplan_telegram/
-│   ├── bot.py                    # scheduled CLI: fetch → archive → send
+│   ├── cli.py                    # scheduled CLI: fetch → archive
 │   ├── vercel.py                 # FastAPI webhook application
 │   ├── commands.py               # command handlers + Telegram menu metadata
 │   ├── chart.py                  # pure-stdlib SVG bar chart
@@ -215,7 +213,8 @@ Base URL: `https://app-api.zonneplan.nl/api`
 
 ## Notes
 
-- `data/` and `chart.svg` are resolved relative to the working directory, so run the `bot.py` CLI from the repository root.
+- `data/` is resolved relative to the working directory, so run the `update-prices` CLI from the repository root.
 - `chart.py` assembles the SVG from plain strings, so neither matplotlib nor numpy is deployed and `/chart` has no heavy import to pay for on a cold start.
+- `/chart` renders today's hours only: `handle_chart` passes `APIResponse.get_today_prices()` (filtered on the local date), so the x-axis spans 00:00–23:59 and tomorrow's published prices never appear. A bar is grey once its whole hour has elapsed and green for the current hour and the future.
 - Telegram only renders raster images through `sendPhoto`, so `/chart` delivers the SVG with `sendDocument`: it arrives as a file that opens in the Telegram viewer instead of an inline image.
 - `/chart` writes its SVG to `/tmp`, the only writable location on Vercel.
