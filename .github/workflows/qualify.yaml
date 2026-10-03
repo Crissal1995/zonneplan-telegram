@@ -1,12 +1,12 @@
 ---
-name: Qualification
+name: 🐍
 
 on:
   pull_request:
 
 jobs:
   qualification:
-    name: 🐍
+    name: Qualification
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,5 +16,3 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv tool install tox --with tox-uv
       - run: tox
-      - name: Qualification result
-        run: echo "Qualification completed successfully."
