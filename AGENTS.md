@@ -6,8 +6,9 @@ Guidance for AI coding agents working in this repository.
 
 `zonneplan-telegram` fetches the hourly electricity prices from the Zonneplan consumer API, answers Telegram commands through a webhook, and archives the price history as one JSON file per day.
 
-- **Webhook** — `app.py` → `src/zonneplan_telegram/vercel.py` (FastAPI, `POST /api/webhook`). Answers `/priceNow`, `/priceTomorrow`, `/chart` and `/help` on demand.
+- **Webhook** — `app.py` → `src/zonneplan_telegram/vercel.py` (FastAPI, `POST /api/webhook`). Answers `/priceNow`, `/priceTomorrow`, `/chart`, `/digest`, `/subscribe`, `/unsubscribe` and `/help` on demand.
 - **Scheduled CLI** — `src/zonneplan_telegram/cli.py` (`update_prices()`). Fetches the prices and archives them to `data/`; run by the `push.yaml` GitHub Action, never by the webhook.
+- **Daily digest** — subscribers (`UPSTASH_REDIS_REST_URL`/`_TOKEN`) get a daily message at `DIGEST_HOUR` (06:00 `Europe/Amsterdam`); an external scheduler pings `GET|POST /api/digest` with the `X-Digest-Secret` header.
 
 Python >= 3.12, managed with [uv](https://docs.astral.sh/uv/).
 
@@ -37,8 +38,10 @@ uv run ty check
 app.py                          # Vercel entrypoint: prepends src/ to sys.path, re-exports app
 src/zonneplan_telegram/
   cli.py                        # scheduled CLI: fetch → archive
-  vercel.py                     # FastAPI webhook application
+  vercel.py                     # FastAPI webhook application + digest trigger
   commands.py                   # command handlers + Telegram menu metadata
+  digest.py                     # daily digest rendering + subscriber fan-out
+  subscriptions.py              # Upstash Redis subscriber store (digest)
   chart.py                      # pure-stdlib SVG bar chart
   storage.py                    # per-day JSON persistence
   api/hourly_prices/            # HTTP calls + pydantic models + Markdown rendering
@@ -68,6 +71,7 @@ Two entrypoints share the same modules: the webhook (`vercel.py`) and the schedu
 - **Charts** — `/chart` renders *today's* hours only (00:00–23:59), as `<path>` bars with rounded top corners. The cheapest and the most expensive bar print their value above the bar (`_extreme_labels`), and `_axis_max` adds `Y_HEADROOM_RATIO` headroom so that label stays inside the plot. Telegram rejects SVG in `sendPhoto`, so charts are delivered with `sendDocument` (`send_telegram_document`). A bar is `#d0d0d0` only once its whole hour has elapsed, otherwise `#4caf50`.
 - **Storage** — an existing day file is only rewritten when the new data has *more* entries, so recorded hours are never overwritten. `data/` resolves relative to the working directory, so run the CLI from the repo root.
 - **Allowlist** — an empty allowlist denies everyone; `TELEGRAM_CHAT_ID` or `TELEGRAM_ALLOWED_CHAT_IDS` must be set for commands to work.
+- **Daily digest** — `/api/digest` is triggered by an *external* scheduler (hourly), not by Vercel cron, and only sends when the `MARKET_TIMEZONE` hour equals `DIGEST_HOUR` (default 6), so DST is handled in code rather than by the caller. It refuses to run (`503`) when `DIGEST_SECRET` is unset and requires `X-Digest-Secret`; subscribers live in Upstash Redis (Vercel is read-only) and are intersected with the allowlist before sending. `/digest` previews the message without touching the store.
 - **Dependencies** — Vercel and CI build with uv; run `uv sync` after editing deps so `uv.lock` stays in sync.
 
 ## Configuration
@@ -80,6 +84,10 @@ Read from the environment at runtime (local `.env` is loaded when `python-dotenv
 | `TELEGRAM_CHAT_ID` | yes | Fallback chat id for outgoing messages; also the default allowlist |
 | `TELEGRAM_ALLOWED_CHAT_IDS` | no | Comma-separated chat ids the webhook may answer |
 | `TELEGRAM_WEBHOOK_SECRET` | recommended | Echoed by Telegram in `X-Telegram-Bot-Api-Secret-Token` |
+| `UPSTASH_REDIS_REST_URL` | for the digest | Upstash Redis REST endpoint storing the digest subscribers |
+| `UPSTASH_REDIS_REST_TOKEN` | for the digest | Upstash Redis REST token paired with the URL |
+| `DIGEST_SECRET` | for the digest | Shared secret the scheduler sends in `X-Digest-Secret`; `/api/digest` answers `503` while unset |
+| `DIGEST_HOUR` | no | Local hour (`Europe/Amsterdam`) the digest is delivered at (default `6`) |
 
 ## Reference
 

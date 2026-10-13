@@ -11,6 +11,9 @@ MARKET_TIMEZONE = ZoneInfo("Europe/Amsterdam")
 
 PriceEntry = dict[Literal["amount"], float]
 
+# Number of consecutive hours considered when looking for the cheapest charging window.
+DIGEST_WINDOW_HOURS = 5
+
 
 def _now() -> datetime.datetime:
     """Returns the current instant in the price market timezone."""
@@ -77,6 +80,19 @@ class APIResponse(BaseModel):
         tomorrow = (_now() + datetime.timedelta(days=1)).date()
         return [item for item in self.prices if item.start_date.astimezone(MARKET_TIMEZONE).date() == tomorrow]
 
+    def get_cheapest_window(self, hours: int) -> Prices | None:
+        """
+        Returns the ``hours`` consecutive slots of today with the lowest total price.
+
+        Returns ``None`` when today's published prices cover fewer slots than requested. Ties
+        resolve to the earliest window, because ``min`` keeps the first minimum it finds.
+        """
+        today_prices = sorted(self.get_today_prices(), key=lambda item: item.start_date)
+        if len(today_prices) < hours:
+            return None
+        windows = (today_prices[index : index + hours] for index in range(len(today_prices) - hours + 1))
+        return min(windows, key=lambda window: sum(item.price_cents for item in window))
+
     def as_price_now_markdown(self) -> str:
         """
         Renders the tariff of the current hour together with today's summary.
@@ -139,6 +155,41 @@ class APIResponse(BaseModel):
                 f"• Max: `{max(prices):.2f} ct/kWh` (`{most_expensive.start_date.astimezone(MARKET_TIMEZONE):%H:%M}`)",
                 f"• Avg: `{sum(prices) / len(prices):.2f} ct/kWh`",
             ]
+        )
+
+        return "\n".join(message_lines)
+
+    def as_daily_digest_markdown(self) -> str:
+        """
+        Renders the daily digest: today's cheapest hour and the cheapest contiguous window.
+        """
+        now_local = _now()
+        message_lines = [
+            "⚡ **Zonneplan - Daily digest** ⚡",
+            "",
+            f"📅 **Today ({now_local:%Y-%m-%d})**",
+        ]
+
+        today_prices = self.get_today_prices()
+        if not today_prices:
+            message_lines.append("• *Prices not published yet.*")
+            return "\n".join(message_lines)
+
+        cheapest = min(today_prices, key=lambda item: item.price_cents)
+        cheapest_hour = cheapest.start_date.astimezone(MARKET_TIMEZONE)
+        message_lines.append(f"💡 Minimum: `{cheapest.price_cents:.2f} ct/kWh` at `{cheapest_hour:%H:%M}`")
+
+        window = self.get_cheapest_window(DIGEST_WINDOW_HOURS)
+        if window is None:
+            message_lines.append(f"🏆 Cheapest {DIGEST_WINDOW_HOURS}h window: *not enough hours published yet.*")
+            return "\n".join(message_lines)
+
+        window_start = window[0].start_date.astimezone(MARKET_TIMEZONE)
+        window_end = window[-1].end_date.astimezone(MARKET_TIMEZONE)
+        window_average = sum(item.price_cents for item in window) / len(window)
+        message_lines.append(
+            f"🏆 Cheapest {DIGEST_WINDOW_HOURS}h window: `{window_start:%H:%M} - {window_end:%H:%M}` "
+            f"(`avg {window_average:.2f} ct/kWh`)"
         )
 
         return "\n".join(message_lines)
