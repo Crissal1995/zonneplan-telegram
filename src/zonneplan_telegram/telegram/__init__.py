@@ -63,29 +63,24 @@ def send_telegram_message(
     response.raise_for_status()
 
 
-def send_telegram_document(
-    document_path: str | Path,
+def send_telegram_photo(
+    photo_path: str | Path,
     caption: str,
     *,
     chat_id: str | None = None,
     bot_token: SecretStr | str | None = None,
 ) -> None:
-    """
-    Sends a local file with ``sendDocument``.
-
-    Telegram only accepts raster images for ``sendPhoto``, so SVG charts are delivered
-    as a document instead.
-    """
+    """Sends a local image with ``sendPhoto`` so Telegram renders it inline."""
     resolved_chat_id, resolved_bot_token = _resolve_credentials(chat_id, bot_token)
 
-    url = f"https://api.telegram.org/bot{resolved_bot_token}/sendDocument"
-    document = Path(document_path)
+    url = f"https://api.telegram.org/bot{resolved_bot_token}/sendPhoto"
+    photo = Path(photo_path)
     payload = {
         "chat_id": resolved_chat_id,
         "caption": caption,
         "parse_mode": "Markdown",
     }
-    files = {"document": (document.name, document.read_bytes())}
-    logger.info("Sending document {} to Telegram.", document.name)
+    files = {"photo": (photo.name, photo.read_bytes())}
+    logger.info("Sending photo {} to Telegram.", photo.name)
     response = requests.post(url, data=payload, files=files, timeout=30)
     response.raise_for_status()

@@ -1,12 +1,11 @@
 """
-Zonneplan-style bar chart rendered as SVG.
+Zonneplan-style bar chart rendered as a JPEG.
 
-The chart is built from strings only, so the serverless bundle stays small and
-``/chart`` does not pay for importing matplotlib (and numpy) on a cold start.
-
-Hours are labelled, and split into past and upcoming, in the price market timezone
-(``MARKET_TIMEZONE``) rather than in the timezone of the machine that renders the SVG,
-so the axis stays correct when the chart is generated on a UTC server such as Vercel.
+The chart is drawn with Pillow on a raster canvas because Telegram renders raster images
+inline through ``sendPhoto``, whereas an SVG only arrives as a downloadable file. Hours are
+labelled, and split into past and upcoming, in the price market timezone (``MARKET_TIMEZONE``)
+rather than in the timezone of the machine that renders the image, so the axis stays correct
+when the chart is generated on a UTC server such as Vercel.
 """
 
 from __future__ import annotations
@@ -14,14 +13,18 @@ from __future__ import annotations
 import datetime
 import math
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple, cast
+
+from PIL import Image, ImageDraw, ImageFont
 
 from zonneplan_telegram.api.hourly_prices.model import MARKET_TIMEZONE
 
 if TYPE_CHECKING:
+    from PIL.ImageFont import FreeTypeFont
+
     from zonneplan_telegram.api.hourly_prices.model import Prices
 
-# Canvas geometry, in SVG user units (1 unit == 1 px at the declared width).
+# Canvas geometry, in pixels.
 WIDTH = 1200
 HEIGHT = 620
 MARGIN_LEFT = 78
@@ -40,8 +43,10 @@ Y_TITLE_OFFSET = 26
 BAR_WIDTH_RATIO = 0.72
 BAR_CORNER_RADIUS = 8
 EXTREME_LABEL_OFFSET = 10
+FONT_SIZE = 15
+JPEG_QUALITY = 90
 
-FONT_FAMILY = "Helvetica, Arial, sans-serif"
+BACKGROUND_COLOR = "#ffffff"
 TEXT_COLOR = "#666666"
 EXTREME_TEXT_COLOR = "#333333"
 GRID_COLOR = "#cccccc"
@@ -49,17 +54,16 @@ BAR_COLOR_PAST = "#d0d0d0"
 BAR_COLOR_ACTIVE = "#4caf50"
 Y_AXIS_TITLE = "ct / kWh"
 
-CANVAS_ATTRIBUTES = f'width="{WIDTH}" height="{HEIGHT}"'
-CANVAS_VIEW_BOX = f'viewBox="0 0 {WIDTH} {HEIGHT}"'
-LABEL_STYLE = f'font-family="{FONT_FAMILY}" font-size="15" fill="{TEXT_COLOR}"'
-X_LABEL_STYLE = f'{LABEL_STYLE} text-anchor="middle"'
-Y_LABEL_STYLE = f'{LABEL_STYLE} text-anchor="end" dominant-baseline="middle"'
-EXTREME_LABEL_STYLE = (
-    f'font-family="{FONT_FAMILY}" font-size="15" fill="{EXTREME_TEXT_COLOR}" text-anchor="middle" font-weight="bold"'
-)
+
+class _Plot(NamedTuple):
+    """Geometry shared by the drawing helpers."""
+
+    width: float
+    height: float
+    axis_max: float
 
 
-def generate_zonneplan_bar_chart(prices: Prices, output_path: str = "chart.svg") -> Path:
+def generate_zonneplan_bar_chart(prices: Prices, output_path: str = "chart.jpg") -> Path:
     """
     Renders ``prices`` as a Zonneplan-style bar chart and returns the path it wrote.
 
@@ -71,26 +75,31 @@ def generate_zonneplan_bar_chart(prices: Prices, output_path: str = "chart.svg")
         raise ValueError(msg)
 
     output_file = Path(output_path)
-    output_file.write_text(_render_svg(prices), encoding="utf-8")
+    _render_image(prices).save(output_file, format="JPEG", quality=JPEG_QUALITY)
     return output_file
 
 
-def _render_svg(prices: Prices) -> str:
-    plot_width = WIDTH - MARGIN_LEFT - MARGIN_RIGHT
-    plot_height = HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
-    axis_max = _axis_max(max(item.price_cents for item in prices))
+def _render_image(prices: Prices) -> Image.Image:
+    image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND_COLOR)
+    draw = ImageDraw.Draw(image)
+    font = _load_font(FONT_SIZE)
+    plot = _Plot(
+        width=WIDTH - MARGIN_LEFT - MARGIN_RIGHT,
+        height=HEIGHT - MARGIN_TOP - MARGIN_BOTTOM,
+        axis_max=_axis_max(max(item.price_cents for item in prices)),
+    )
 
-    elements = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" {CANVAS_ATTRIBUTES} {CANVAS_VIEW_BOX}>',
-        f'<rect {CANVAS_ATTRIBUTES} fill="#ffffff"/>',
-        *_grid(plot_height, axis_max),
-        *_bars(prices, plot_width, plot_height, axis_max),
-        *_hour_labels(prices, plot_width, plot_height),
-        *_extreme_labels(prices, plot_width, plot_height, axis_max),
-        _y_axis_title(plot_height),
-        "</svg>",
-    ]
-    return "\n".join(elements)
+    _draw_grid(draw, font, plot)
+    _draw_bars(draw, prices, plot)
+    _draw_hour_labels(draw, font, prices, plot)
+    _draw_extreme_labels(draw, font, prices, plot)
+    _draw_y_axis_title(image, font, plot)
+    return image
+
+
+def _load_font(size: int) -> FreeTypeFont:
+    """Returns a scalable font, using Pillow's bundled default so no system font is required."""
+    return cast("FreeTypeFont", ImageFont.load_default(size=size))
 
 
 def _axis_max(highest: float) -> float:
@@ -104,89 +113,75 @@ def _y_position(value: float, plot_height: float, axis_max: float) -> float:
     return MARGIN_TOP + plot_height * (1 - value / axis_max)
 
 
-def _grid(plot_height: float, axis_max: float) -> list[str]:
+def _draw_grid(draw: ImageDraw.ImageDraw, font: FreeTypeFont, plot: _Plot) -> None:
     """Horizontal gridlines with their value labels."""
     right = WIDTH - MARGIN_RIGHT
-    elements = []
 
-    for value in range(0, int(axis_max) + Y_TICK_STEP, Y_TICK_STEP):
-        y = _n(_y_position(value, plot_height, axis_max))
-        elements.append(f'<line x1="{MARGIN_LEFT}" y1="{y}" x2="{right}" y2="{y}" stroke="{GRID_COLOR}"/>')
-        elements.append(f'<text x="{MARGIN_LEFT - Y_LABEL_OFFSET}" y="{y}" {Y_LABEL_STYLE}>{value}</text>')
-
-    return elements
+    for value in range(0, int(plot.axis_max) + Y_TICK_STEP, Y_TICK_STEP):
+        y = _y_position(value, plot.height, plot.axis_max)
+        draw.line(((MARGIN_LEFT, y), (right, y)), fill=GRID_COLOR, width=1)
+        draw.text((MARGIN_LEFT - Y_LABEL_OFFSET, y), str(value), font=font, fill=TEXT_COLOR, anchor="rm")
 
 
-def _bars(prices: Prices, plot_width: float, plot_height: float, axis_max: float) -> list[str]:
+def _draw_bars(draw: ImageDraw.ImageDraw, prices: Prices, plot: _Plot) -> None:
     now = datetime.datetime.now(MARKET_TIMEZONE)
-    slot = plot_width / len(prices)
+    slot = plot.width / len(prices)
     width = slot * BAR_WIDTH_RATIO
+    baseline = MARGIN_TOP + plot.height
 
-    elements = []
     for index, item in enumerate(prices):
-        height = plot_height * item.price_cents / axis_max
+        height = plot.height * item.price_cents / plot.axis_max
         center = MARGIN_LEFT + slot * (index + 0.5)
-        top = MARGIN_TOP + plot_height - height
         color = BAR_COLOR_PAST if item.end_date.astimezone(MARKET_TIMEZONE) <= now else BAR_COLOR_ACTIVE
-        bar = _bar_path(center - width / 2, top, width, height)
-        elements.append(f'<path d="{bar}" fill="{color}"/>')
-
-    return elements
+        box = (round(center - width / 2), round(baseline - height), round(center + width / 2), round(baseline))
+        _draw_bar(draw, box, color)
 
 
-def _bar_path(x: float, y: float, width: float, height: float) -> str:
+def _draw_bar(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], color: str) -> None:
     """A bar whose top corners are rounded, so the chart reads softer than plain rectangles."""
-    radius = min(BAR_CORNER_RADIUS, width / 2, height)
-    bottom = y + height
-    return (
-        f"M {_n(x)} {_n(bottom)}"
-        f" V {_n(y + radius)}"
-        f" Q {_n(x)} {_n(y)} {_n(x + radius)} {_n(y)}"
-        f" H {_n(x + width - radius)}"
-        f" Q {_n(x + width)} {_n(y)} {_n(x + width)} {_n(y + radius)}"
-        f" V {_n(bottom)} Z"
-    )
+    left, top, right, bottom = box
+    radius = min(BAR_CORNER_RADIUS, (right - left) / 2, (bottom - top) / 2)
+    draw.rectangle((left, top + round(radius), right, bottom), fill=color)
+    draw.rounded_rectangle((left, top, right, top + round(2 * radius)), radius=radius, fill=color)
 
 
-def _extreme_labels(prices: Prices, plot_width: float, plot_height: float, axis_max: float) -> list[str]:
+def _draw_extreme_labels(draw: ImageDraw.ImageDraw, font: FreeTypeFont, prices: Prices, plot: _Plot) -> None:
     """Writes the value on top of the cheapest and the most expensive bar."""
-    slot = plot_width / len(prices)
+    slot = plot.width / len(prices)
     cheapest = min(range(len(prices)), key=lambda index: prices[index].price_cents)
     most_expensive = max(range(len(prices)), key=lambda index: prices[index].price_cents)
+    baseline = MARGIN_TOP + plot.height
 
-    elements = []
     for index in sorted({cheapest, most_expensive}):
-        height = plot_height * prices[index].price_cents / axis_max
-        center = _n(MARGIN_LEFT + slot * (index + 0.5))
-        baseline = _n(MARGIN_TOP + plot_height - height - EXTREME_LABEL_OFFSET)
-        elements.append(
-            f'<text x="{center}" y="{baseline}" {EXTREME_LABEL_STYLE}>{prices[index].price_cents:.2f}</text>'
+        height = plot.height * prices[index].price_cents / plot.axis_max
+        center = MARGIN_LEFT + slot * (index + 0.5)
+        draw.text(
+            (center, baseline - height - EXTREME_LABEL_OFFSET),
+            f"{prices[index].price_cents:.2f}",
+            font=font,
+            fill=EXTREME_TEXT_COLOR,
+            anchor="ms",
         )
 
-    return elements
 
-
-def _hour_labels(prices: Prices, plot_width: float, plot_height: float) -> list[str]:
+def _draw_hour_labels(draw: ImageDraw.ImageDraw, font: FreeTypeFont, prices: Prices, plot: _Plot) -> None:
     """Hour labels every ``X_LABEL_HOUR_INTERVAL`` hours, in the price market timezone."""
-    slot = plot_width / len(prices)
-    baseline = _n(MARGIN_TOP + plot_height + X_LABEL_OFFSET)
+    slot = plot.width / len(prices)
+    y = MARGIN_TOP + plot.height + X_LABEL_OFFSET
 
-    elements = []
     for index, item in enumerate(prices):
         start_local = item.start_date.astimezone(MARKET_TIMEZONE)
         if start_local.hour % X_LABEL_HOUR_INTERVAL != 0:
             continue
-        center = _n(MARGIN_LEFT + slot * (index + 0.5))
-        elements.append(f'<text x="{center}" y="{baseline}" {X_LABEL_STYLE}>{start_local:%H}</text>')
-
-    return elements
+        center = MARGIN_LEFT + slot * (index + 0.5)
+        draw.text((center, y), f"{start_local:%H}", font=font, fill=TEXT_COLOR, anchor="ma")
 
 
-def _y_axis_title(plot_height: float) -> str:
-    transform = f"translate({Y_TITLE_OFFSET} {_n(MARGIN_TOP + plot_height / 2)}) rotate(-90)"
-    return f'<text transform="{transform}" {X_LABEL_STYLE}>{Y_AXIS_TITLE}</text>'
-
-
-def _n(value: float) -> str:
-    """Formats a coordinate without trailing zeros, to keep the SVG compact."""
-    return f"{value:.2f}".rstrip("0").rstrip(".")
+def _draw_y_axis_title(image: Image.Image, font: FreeTypeFont, plot: _Plot) -> None:
+    """Draws the ``ct / kWh`` unit rotated along the left gutter."""
+    left, top, right, bottom = font.getbbox(Y_AXIS_TITLE)
+    tile = Image.new("RGBA", (int(right - left) + 4, int(bottom - top) + 8), (0, 0, 0, 0))
+    ImageDraw.Draw(tile).text((2 - left, 4 - top), Y_AXIS_TITLE, font=font, fill=TEXT_COLOR)
+    rotated = tile.rotate(90, expand=True)
+    center_y = MARGIN_TOP + plot.height / 2
+    image.paste(rotated, (Y_TITLE_OFFSET - rotated.width // 2, round(center_y - rotated.height / 2)), rotated)

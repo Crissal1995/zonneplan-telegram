@@ -10,7 +10,7 @@ The bot is deployed as a [Vercel Function](https://vercel.com/docs/functions) th
 | --- | --- |
 | `/priceNow` | Tariff of the current hour, plus today's min / max / average |
 | `/priceTomorrow` | Tomorrow's min / max / average with the hours of the cheapest and most expensive slot, or a notice while the prices are not published yet |
-| `/chart` | The Zonneplan bar chart for today (00:00–23:59), sent as an SVG document |
+| `/chart` | The Zonneplan bar chart for today (00:00–23:59), sent as a JPEG photo |
 | `/digest` | Preview of the daily digest (today's minimum and the cheapest 5-hour window) |
 | `/subscribe` | Subscribe the chat to the daily digest |
 | `/unsubscribe` | Unsubscribe the chat from the daily digest |
@@ -45,8 +45,8 @@ flowchart LR
     V --> B["commands.py"]
     A["Zonneplan API<br/>consumer-prices/charts"] -->|hourly prices| B
     B -->|Markdown summary| E["telegram/<br/>sendMessage"]
-    B -->|SVG document| F["telegram/<br/>sendDocument"]
-    B --> D["chart.py<br/>pure-stdlib SVG"]
+    B -->|JPEG photo| F["telegram/<br/>sendPhoto"]
+    B --> D["chart.py<br/>Pillow JPEG"]
 ```
 
 Two entrypoints share the same building blocks.
@@ -109,7 +109,7 @@ UPSTASH_REDIS_REST_TOKEN=your-upstash-rest-token
 DIGEST_SECRET=some-other-random-string
 ```
 
-Both `send_telegram_message()` and `send_telegram_document()` also accept explicit `bot_token` / `chat_id` arguments that take precedence over the environment.
+Both `send_telegram_message()` and `send_telegram_photo()` also accept explicit `bot_token` / `chat_id` arguments that take precedence over the environment.
 
 ## Deploying to Vercel
 
@@ -224,7 +224,7 @@ Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring cop
 │   ├── commands.py               # command handlers + Telegram menu metadata
 │   ├── digest.py                 # daily digest rendering + subscriber fan-out
 │   ├── subscriptions.py          # Upstash Redis subscriber store
-│   ├── chart.py                  # pure-stdlib SVG bar chart
+│   ├── chart.py                  # Pillow JPEG bar chart
 │   ├── storage.py                # per-day JSON persistence
 │   ├── api/
 │   │   ├── __init__.py           # API base URL
@@ -232,7 +232,7 @@ Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring cop
 │   │       ├── __init__.py       # HTTP calls (hourly & quarter-hourly)
 │   │       └── model.py          # pydantic models + Markdown rendering
 │   └── telegram/
-│       ├── __init__.py           # sendMessage / sendDocument clients + allowlist
+│       ├── __init__.py           # sendMessage / sendPhoto clients + allowlist
 │       ├── models.py             # minimal Update / Message / Chat models
 │       └── set_webhook.py        # `set-webhook` CLI (setWebhook + setMyCommands)
 ├── pyproject.toml                # metadata, deps, vercel entrypoint, ruff & tox config
@@ -250,7 +250,7 @@ Base URL: `https://app-api.zonneplan.nl/api`
 ## Notes
 
 - `data/` is resolved relative to the working directory, so run the `update-prices` CLI from the repository root.
-- `chart.py` assembles the SVG from plain strings, so neither matplotlib nor numpy is deployed and `/chart` has no heavy import to pay for on a cold start.
+- `chart.py` draws the chart with Pillow (no matplotlib nor numpy), so the JPEG stays cheap to produce on a cold start. Text uses Pillow's bundled default font, so no system font is required on the serverless host.
 - `/chart` renders today's hours only: `handle_chart` passes `APIResponse.get_today_prices()`, so the x-axis spans 00:00–23:59 and tomorrow's published prices never appear. Hours are labelled, and bars are split into grey (elapsed) and green (current hour and upcoming), in `MARKET_TIMEZONE` (`Europe/Amsterdam`) rather than in the timezone of the machine that renders the chart, so the axis stays correct on a UTC server such as Vercel. Bar tops are rounded and the cheapest and the most expensive hour print their price above the bar.
-- Telegram only renders raster images through `sendPhoto`, so `/chart` delivers the SVG with `sendDocument`: it arrives as a file that opens in the Telegram viewer instead of an inline image.
-- `/chart` writes its SVG to `/tmp`, the only writable location on Vercel.
+- Telegram renders raster images inline through `sendPhoto`, so `/chart` delivers the JPEG with `sendPhoto` and it appears directly in the chat instead of as a downloadable file.
+- `/chart` writes its JPEG to `/tmp`, the only writable location on Vercel.

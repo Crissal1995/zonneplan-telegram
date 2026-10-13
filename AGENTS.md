@@ -42,10 +42,10 @@ src/zonneplan_telegram/
   commands.py                   # command handlers + Telegram menu metadata
   digest.py                     # daily digest rendering + subscriber fan-out
   subscriptions.py              # Upstash Redis subscriber store (digest)
-  chart.py                      # pure-stdlib SVG bar chart
+  chart.py                      # Pillow JPEG bar chart
   storage.py                    # per-day JSON persistence
   api/hourly_prices/            # HTTP calls + pydantic models + Markdown rendering
-  telegram/                     # sendMessage / sendDocument clients, allowlist, models, set-webhook CLI
+  telegram/                     # sendMessage / sendPhoto clients, allowlist, models, set-webhook CLI
 data/                           # archived price history, one JSON file per local day
 ```
 
@@ -61,14 +61,14 @@ Two entrypoints share the same modules: the webhook (`vercel.py`) and the schedu
   - FastAPI route params need `Annotated[...]` dependencies (FAST002).
   - Lazy function-level imports need `# noqa: PLC0415`.
   - Implicit string concatenation inside a collection must be parenthesized (ISC004); prefer single lines that fit in 120 chars.
-- Runtime dependencies stay minimal (`fastapi`, `loguru`, `pydantic`, `requests`, `tzdata`). Do not add matplotlib/numpy — `chart.py` assembles the SVG from plain strings. `tzdata` backs `MARKET_TIMEZONE`; without it `zoneinfo` cannot resolve `Europe/Amsterdam` on platforms that ship no system tz database, such as Windows.
+- Runtime dependencies stay minimal (`fastapi`, `loguru`, `pillow`, `pydantic`, `requests`, `tzdata`). Do not add matplotlib/numpy — `chart.py` draws the JPEG with Pillow. `tzdata` backs `MARKET_TIMEZONE`; without it `zoneinfo` cannot resolve `Europe/Amsterdam` on platforms that ship no system tz database, such as Windows.
 
 ## Gotchas
 
 - **Vercel entrypoint** — `[tool.vercel] entrypoint = "app:app"` points at the root `app.py` shim. Vercel resolves it as a module path relative to the repo root, so it *cannot* reference `zonneplan_telegram.vercel:app` directly for this `src` layout. `app.py` prepends `src/` to `sys.path` (hence `# noqa: E402`). Keep the `vercel.json` `functions` key in sync with `app.py`.
-- **Filesystem** — Vercel is read-only except `/tmp`; `/chart` writes its SVG there. Only the GitHub Action (`cli.py`) writes to `data/`.
+- **Filesystem** — Vercel is read-only except `/tmp`; `/chart` writes its JPEG there. Only the GitHub Action (`cli.py`) writes to `data/`.
 - **Chart hours** — every hour is resolved in `MARKET_TIMEZONE` (`Europe/Amsterdam`, defined in `api/hourly_prices/model.py`), never in the timezone of the host: Vercel runs in UTC, so `datetime.now().astimezone()` used to shift the labels *and* the grey/green split by the DST offset. `APIResponse.get_today_prices()` filters on the same zone.
-- **Charts** — `/chart` renders *today's* hours only (00:00–23:59), as `<path>` bars with rounded top corners. The cheapest and the most expensive bar print their value above the bar (`_extreme_labels`), and `_axis_max` adds `Y_HEADROOM_RATIO` headroom so that label stays inside the plot. Telegram rejects SVG in `sendPhoto`, so charts are delivered with `sendDocument` (`send_telegram_document`). A bar is `#d0d0d0` only once its whole hour has elapsed, otherwise `#4caf50`.
+- **Charts** — `/chart` renders *today's* hours only (00:00–23:59) as a JPEG drawn with Pillow, delivered with `sendPhoto` (`send_telegram_photo`) so it renders inline; bar top corners are rounded. The cheapest and the most expensive bar print their value above the bar (`_draw_extreme_labels`), and `_axis_max` adds `Y_HEADROOM_RATIO` headroom so that label stays inside the plot. A bar is `#d0d0d0` only once its whole hour has elapsed, otherwise `#4caf50`. Text uses Pillow's bundled default font (`ImageFont.load_default(size=...)`), so no system font is required.
 - **Storage** — an existing day file is only rewritten when the new data has *more* entries, so recorded hours are never overwritten. `data/` resolves relative to the working directory, so run the CLI from the repo root.
 - **Allowlist** — an empty allowlist denies everyone; `TELEGRAM_CHAT_ID` or `TELEGRAM_ALLOWED_CHAT_IDS` must be set for commands to work.
 - **Daily digest** — `/api/digest` is triggered by an *external* scheduler (hourly), not by Vercel cron, and only sends when the `MARKET_TIMEZONE` hour equals `DIGEST_HOUR` (default 6), so DST is handled in code rather than by the caller. It refuses to run (`503`) when `DIGEST_SECRET` is unset and requires `X-Digest-Secret`; subscribers live in Upstash Redis (Vercel is read-only) and are intersected with the allowlist before sending. `/digest` previews the message without touching the store.

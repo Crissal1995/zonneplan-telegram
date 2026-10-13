@@ -47,7 +47,8 @@ def _call(method: str, bot_token: str, payload: dict[str, Any]) -> object:
 
 def set_webhook(base_url: str, *, bot_token: str, secret_token: str | None = None) -> str:
     """Points Telegram at ``<base_url>/api/webhook`` and returns the registered URL."""
-    url = f"{base_url.rstrip('/')}{WEBHOOK_PATH}"
+    normalized = base_url if "://" in base_url else f"https://{base_url}"
+    url = f"{normalized.rstrip('/')}{WEBHOOK_PATH}"
     payload: dict[str, Any] = {
         "url": url,
         "allowed_updates": ["message"],
