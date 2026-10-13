@@ -35,7 +35,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT }}
           COMMENT: >-
-            ✨ _This pull request has been automatically closed because a new one has been created._
+            :robot: _This pull request has been automatically closed because a new one has been created._
 
             [Workflow run](${{ env.WORKFLOW_RUN }}).
       - name: Create Pull Request for Data Updates
@@ -56,7 +56,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT }}
           COMMENT: >-
-            ✨ _This pull request has been automatically approved._
+            :robot: _This pull request has been automatically approved and will be merged automatically._
 
             [Workflow run](${{ env.WORKFLOW_RUN }}).
       - name: Force merge
