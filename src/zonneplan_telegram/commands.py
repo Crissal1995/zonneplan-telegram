@@ -16,7 +16,7 @@ from zonneplan_telegram.api.hourly_prices import get_zonneplan_hourly_prices
 from zonneplan_telegram.chart import generate_zonneplan_bar_chart
 from zonneplan_telegram.digest import build_daily_digest
 from zonneplan_telegram.subscriptions import add_subscriber, remove_subscriber
-from zonneplan_telegram.telegram import send_telegram_document, send_telegram_message
+from zonneplan_telegram.telegram import send_telegram_message, send_telegram_photo
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -82,12 +82,12 @@ def handle_price_tomorrow(chat_id: int) -> None:
 
 
 def handle_chart(chat_id: int) -> None:
-    """Renders today's hourly price chart (00:00-23:59) and sends it as an SVG document."""
+    """Renders today's hourly price chart (00:00-23:59) and sends it as a JPEG photo."""
     response = get_zonneplan_hourly_prices()
-    output_path = Path(tempfile.gettempdir()) / f"zonneplan-chart-{chat_id}.svg"
+    output_path = Path(tempfile.gettempdir()) / f"zonneplan-chart-{chat_id}.jpg"
     generate_zonneplan_bar_chart(response.get_today_prices(), output_path=str(output_path))
-    send_telegram_document(
-        document_path=output_path,
+    send_telegram_photo(
+        photo_path=output_path,
         caption="Zonneplan hourly price chart",
         chat_id=str(chat_id),
     )
