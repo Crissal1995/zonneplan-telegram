@@ -1,17 +1,17 @@
 [[repos]]
 repo = "builtin"
 hooks = [
-	{ id = "trailing-whitespace" },
-	{ id = "end-of-file-fixer" },
-	{ id = "mixed-line-ending" },
-	{ id = "check-merge-conflict" },
-	{ id = "check-added-large-files" },
-	{ id = "check-case-conflict" },
-	{ id = "check-symlinks" },
-	{ id = "check-toml" },
-	{ id = "check-yaml" },
-	{ id = "check-json" },
-	{ id = "detect-private-key" },
+	{ id = "trailing-whitespace", priority = 0 },
+	{ id = "end-of-file-fixer", priority = 0 },
+	{ id = "mixed-line-ending", priority = 0 },
+	{ id = "check-merge-conflict", priority = 0 },
+	{ id = "check-added-large-files", priority = 0 },
+	{ id = "check-case-conflict", priority = 0 },
+	{ id = "check-symlinks", priority = 0 },
+	{ id = "check-toml", priority = 0 },
+	{ id = "check-yaml", priority = 0 },
+	{ id = "check-json", priority = 0 },
+	{ id = "detect-private-key", priority = 0 },
 ]
 
 [[repos]]
@@ -23,6 +23,7 @@ name = "ruff format"
 entry = "uv run ruff format"
 language = "system"
 types = ["python"]
+priority = 1
 
 [[repos.hooks]]
 id = "ruff-check"
@@ -30,6 +31,7 @@ name = "ruff check"
 entry = "uv run ruff check --fix"
 language = "system"
 types = ["python"]
+priority = 2
 
 [[repos.hooks]]
 id = "ty"
@@ -37,8 +39,4 @@ name = "ty check"
 entry = "uv run ty check --fix"
 language = "system"
 types = ["python"]
-
-[[repos]]
-repo = "https://github.com/renovatebot/pre-commit-hooks"
-rev = "44.158.2"
-hooks = [{ id = "renovate-config-validator", args = ["--strict"] }]
+priority = 3
