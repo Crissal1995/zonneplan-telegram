@@ -1,0 +1,4 @@
+[tools]
+gh = "latest"
+jactionlint = "2.2.0"
+shellcheck = "latest"

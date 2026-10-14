@@ -18,6 +18,14 @@ hooks = [
 repo = "local"
 
 [[repos.hooks]]
+id = "jactionlint"
+name = "jactionlint"
+entry = "jactionlint"
+language = "system"
+types = ["yaml"]
+priority = 1
+
+[[repos.hooks]]
 id = "ruff-format"
 name = "ruff format"
 entry = "uv run ruff format"
