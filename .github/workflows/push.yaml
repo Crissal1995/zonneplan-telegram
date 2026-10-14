@@ -14,13 +14,13 @@ jobs:
     env:
       WORKFLOW_RUN: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Compute the dated branch name
         run: echo "PR_BRANCH=automated-data-update-$(date -u +%F)" >> "$GITHUB_ENV"
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.14"
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Update prices
         run: uv run update-prices
         env:
@@ -42,7 +42,7 @@ jobs:
       - name: Create Pull Request for Data Updates
         # The output of this step will be used to get the pull request number for approval and merging.
         # In case no data updates are found, the step will not create a pull request and the output will be empty.
-        uses: peter-evans/create-pull-request@v8.1.1
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         id: pr
         with:
           commit-message: "chore(data): update price history"
