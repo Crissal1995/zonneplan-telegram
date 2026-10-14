@@ -8,15 +8,17 @@ jobs:
   update-prices:
     name: ✈️
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:
           client-id: ${{ vars.APP_CLIENT_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-pull-requests: write
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Compute the dated branch name
         run: echo "PR_BRANCH=automated-data-update-$(date -u +%F)" >> "$GITHUB_ENV"
@@ -30,6 +32,7 @@ jobs:
           UV_FROZEN: 1
           UV_NO_DEV: 1
       - name: Close existing pull requests on the same branch
+        shell: bash
         run: |
           gh pr list --head ${{ env.PR_BRANCH }} --state open --json number --jq '.[].number' |
             while read -r number; do
