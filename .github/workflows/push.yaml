@@ -12,10 +12,11 @@ jobs:
       contents: write
       pull-requests: write
     env:
-      PR_BRANCH: automated-data-update
       WORKFLOW_RUN: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
     steps:
       - uses: actions/checkout@v7
+      - name: Compute the dated branch name
+        run: echo "PR_BRANCH=automated-data-update-$(date -u +%F)" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
