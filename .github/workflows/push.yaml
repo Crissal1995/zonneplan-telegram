@@ -11,9 +11,12 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    env:
-      WORKFLOW_RUN: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
     steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Compute the dated branch name
         run: echo "PR_BRANCH=automated-data-update-$(date -u +%F)" >> "$GITHUB_ENV"
@@ -34,11 +37,9 @@ jobs:
               gh pr close "$number" --comment "${{ env.COMMENT }}"
             done
         env:
-          GH_TOKEN: ${{ secrets.PAT }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           COMMENT: >-
             :robot: _This pull request has been automatically closed because a new one has been created._
-
-            [Workflow run](${{ env.WORKFLOW_RUN }}).
       - name: Create Pull Request for Data Updates
         # The output of this step will be used to get the pull request number for approval and merging.
         # In case no data updates are found, the step will not create a pull request and the output will be empty.
@@ -55,13 +56,9 @@ jobs:
         if: steps.pr.outputs.pull-request-number != ''
         run: gh pr review ${{ steps.pr.outputs.pull-request-number }} --approve --body "${{ env.COMMENT }}"
         env:
-          GH_TOKEN: ${{ secrets.PAT }}
-          COMMENT: >-
-            :robot: _This pull request has been automatically approved and will be merged automatically._
-
-            [Workflow run](${{ env.WORKFLOW_RUN }}).
-      - name: Force merge
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      - name: Enable auto-merge
         if: steps.pr.outputs.pull-request-number != ''
-        run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --squash --admin
+        run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --auto --squash
         env:
-          GH_TOKEN: ${{ secrets.PAT }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
