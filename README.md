@@ -16,7 +16,7 @@ The bot is deployed as a [Vercel Function](https://vercel.com/docs/functions) th
 | `/unsubscribe` | Unsubscribe the chat from the daily digest |
 | `/help` (and `/start`) | The list of commands |
 
-Matching is case-insensitive and tolerates the `@botusername` suffix, so `/priceNow`, `/pricenow` and `/priceNow@MyBot` all work. Updates from chats that are not in the allowlist are ignored.
+Matching is case-insensitive and tolerates the `@botusername` suffix, so `/priceNow`, `/pricenow` and `/priceNow@MyBot` all work. Any chat may use the bot.
 
 ## Daily digest
 
@@ -33,7 +33,6 @@ A subscriber receives one message per day at **06:00 Europe/Amsterdam** with the
 - The cheapest window is the five **consecutive** hours (DST-safe: it works on the ordered hour list) with the lowest average price; ties resolve to the earliest window.
 - `/subscribe` and `/unsubscribe` maintain the subscriber set, which is stored in Upstash Redis (see [Configuration](#configuration)). `/digest` renders the message on demand without touching the store.
 - Delivery is triggered from **outside** the app: an external scheduler calls `GET /api/digest` with the `X-Digest-Secret` header. Schedule it **hourly** — the endpoint only sends when the local hour in `Europe/Amsterdam` matches `DIGEST_HOUR` (default `6`), so the summer/winter clock change is handled in code and the scheduler needs no timezone support.
-- Only chats that are both subscribed *and* still in the allowlist receive the digest, so removing a chat from the allowlist also stops its digest.
 - `GET /api/digest?force=1` (with a valid secret) bypasses the hour guard to test delivery. `GET /api/digest` returns `{"ok": true, "skipped": true, "sent": 0}` outside the digest hour.
 - When nobody is subscribed the endpoint stays silent and returns `{"ok": true, "skipped": false, "sent": 0}`.
 
@@ -53,7 +52,7 @@ Two entrypoints share the same building blocks.
 
 **`app.py` → `vercel.py` — the webhook (`POST /api/webhook`)**
 
-1. **Verify** — the `X-Telegram-Bot-Api-Secret-Token` header is compared with `TELEGRAM_WEBHOOK_SECRET`, and updates from chats outside the allowlist are dropped.
+1. **Verify** — the `X-Telegram-Bot-Api-Secret-Token` header is compared with `TELEGRAM_WEBHOOK_SECRET`; updates that fail the check are dropped.
 2. **Dispatch** — `commands.py` maps the command to a handler that fetches the prices and replies in the chat that asked.
 
 **`vercel.py` — the digest trigger (`GET|POST /api/digest`)**
@@ -70,7 +69,7 @@ Two entrypoints share the same building blocks.
 
 - Python >= 3.12 (CI runs 3.14)
 - [uv](https://docs.astral.sh/uv/) for dependency management and execution
-- A Telegram bot token and the target chat id
+- A Telegram bot token
 
 ## Installation
 
@@ -87,36 +86,32 @@ The credentials are read from the environment at runtime:
 | Variable | Required | Description |
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | yes | Bot token issued by [@BotFather](https://t.me/BotFather) |
-| `TELEGRAM_CHAT_ID` | yes | Fallback chat id for outgoing messages; also the default allowlist |
-| `TELEGRAM_ALLOWED_CHAT_IDS` | no | Comma-separated chat ids the webhook may answer. Falls back to `TELEGRAM_CHAT_ID` when unset |
 | `TELEGRAM_WEBHOOK_SECRET` | recommended | Secret that Telegram echoes back in the `X-Telegram-Bot-Api-Secret-Token` header. When unset, every caller is accepted |
 | `UPSTASH_REDIS_REST_URL` | for the digest | Upstash Redis REST endpoint that stores the digest subscribers |
 | `UPSTASH_REDIS_REST_TOKEN` | for the digest | Upstash Redis REST token paired with the URL |
 | `DIGEST_SECRET` | for the digest | Shared secret the scheduler sends back in the `X-Digest-Secret` header. The `/api/digest` trigger answers `503` while it is unset |
 | `DIGEST_HOUR` | no | Local hour (`Europe/Amsterdam`) the digest is delivered at. Defaults to `6` |
 
-An empty allowlist means the bot answers nobody, so `TELEGRAM_CHAT_ID` or `TELEGRAM_ALLOWED_CHAT_IDS` must be set for the commands to work. The Upstash and `DIGEST_SECRET` variables are only needed for the daily digest.
+The Upstash and `DIGEST_SECRET` variables are only needed for the daily digest.
 
 For local development, create a `.env` file in the repository root — it is loaded automatically when `python-dotenv` is installed (it is part of the `dev` dependency group):
 
 ```dotenv
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
-TELEGRAM_CHAT_ID=123456789
-TELEGRAM_ALLOWED_CHAT_IDS=123456789,-1001234567890
 TELEGRAM_WEBHOOK_SECRET=some-random-string
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-upstash-rest-token
 DIGEST_SECRET=some-other-random-string
 ```
 
-Both `send_telegram_message()` and `send_telegram_photo()` also accept explicit `bot_token` / `chat_id` arguments that take precedence over the environment.
+Both `send_telegram_message()` and `send_telegram_photo()` take an explicit `chat_id`; their `bot_token` argument takes precedence over the environment.
 
 ## Deploying to Vercel
 
 The repository needs no build step: Vercel detects the FastAPI app from the `fastapi` dependency in `pyproject.toml`, and `[tool.vercel] entrypoint = "app:app"` points at the root-level `app.py`, which re-exports the FastAPI instance from the `src` layout (Vercel resolves that setting as a path relative to the project root, so it cannot reference `src/zonneplan_telegram/vercel.py` directly). Steps that have to be done once, outside the repository:
 
 1. **Import the project.** In the [Vercel dashboard](https://vercel.com/new), import the GitHub repository. Leave *Root Directory* at the repository root and keep the detected **FastAPI** framework preset.
-2. **Add environment variables.** In *Project Settings → Environment Variables*, add `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_ALLOWED_CHAT_IDS` and `TELEGRAM_WEBHOOK_SECRET` for the Production (and optionally Preview) environment.
+2. **Add environment variables.** In *Project Settings → Environment Variables*, add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` for the Production (and optionally Preview) environment.
 3. **Deploy** and note the production URL, e.g. `https://zonneplan-telegram.vercel.app`.
 4. **Register the webhook** from a local checkout, once per deployment URL:
 
@@ -232,7 +227,7 @@ Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring cop
 │   │       ├── __init__.py       # HTTP calls (hourly & quarter-hourly)
 │   │       └── model.py          # pydantic models + Markdown rendering
 │   └── telegram/
-│       ├── __init__.py           # sendMessage / sendPhoto clients + allowlist
+│       ├── __init__.py           # sendMessage / sendPhoto clients
 │       ├── models.py             # minimal Update / Message / Chat models
 │       └── set_webhook.py        # `set-webhook` CLI (setWebhook + setMyCommands)
 ├── pyproject.toml                # metadata, deps, vercel entrypoint, ruff & tox config

@@ -37,3 +37,8 @@ name = "ty check"
 entry = "uv run ty check --fix"
 language = "system"
 types = ["python"]
+
+[[repos]]
+repo = "https://github.com/renovatebot/pre-commit-hooks"
+rev = "44.158.2"
+hooks = [{ id = "renovate-config-validator", args = ["--strict"] }]

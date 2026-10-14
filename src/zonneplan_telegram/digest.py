@@ -12,7 +12,7 @@ from loguru import logger
 
 from zonneplan_telegram.api.hourly_prices import get_zonneplan_hourly_prices
 from zonneplan_telegram.subscriptions import get_subscribers
-from zonneplan_telegram.telegram import get_allowed_chat_ids, send_telegram_message
+from zonneplan_telegram.telegram import send_telegram_message
 
 
 def build_daily_digest() -> str:
@@ -21,15 +21,10 @@ def build_daily_digest() -> str:
 
 
 def send_daily_digest() -> int:
-    """
-    Sends the digest to every subscribed chat that is still allowed and returns the recipient count.
-
-    Chats removed from the allowlist stop receiving the digest even when a stale subscription
-    is still stored in Redis.
-    """
-    recipients = get_subscribers() & get_allowed_chat_ids()
+    """Sends the digest to every subscribed chat and returns the recipient count."""
+    recipients = get_subscribers()
     if not recipients:
-        logger.info("No digest recipients (no subscribers or nobody allowed); nothing sent.")
+        logger.info("No digest recipients (nobody subscribed); nothing sent.")
         return 0
 
     digest = build_daily_digest()

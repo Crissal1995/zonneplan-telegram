@@ -19,7 +19,7 @@ from loguru import logger
 from zonneplan_telegram.api.hourly_prices.model import MARKET_TIMEZONE
 from zonneplan_telegram.commands import COMMANDS, ERROR_MESSAGE, HELP_MESSAGE, parse_command
 from zonneplan_telegram.digest import send_daily_digest
-from zonneplan_telegram.telegram import is_chat_allowed, send_telegram_message
+from zonneplan_telegram.telegram import send_telegram_message
 
 # FastAPI resolves the request-model annotation at runtime, so this import is not type-only.
 from zonneplan_telegram.telegram.models import Update  # noqa: TC001
@@ -58,10 +58,6 @@ def telegram_webhook(
         return {"ok": True}
 
     chat_id = message.chat.id
-    if not is_chat_allowed(chat_id):
-        logger.warning("Ignored update {} from chat {}.", update.update_id, chat_id)
-        return {"ok": True}
-
     command = parse_command(message.text)
     handler = COMMANDS.get(command) if command is not None else None
     if handler is None:
