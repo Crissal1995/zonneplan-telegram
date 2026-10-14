@@ -45,7 +45,7 @@ src/zonneplan_telegram/
   chart.py                      # Pillow JPEG bar chart
   storage.py                    # per-day JSON persistence
   api/hourly_prices/            # HTTP calls + pydantic models + Markdown rendering
-  telegram/                     # sendMessage / sendPhoto clients, allowlist, models, set-webhook CLI
+  telegram/                     # sendMessage / sendPhoto clients, models, set-webhook CLI
 data/                           # archived price history, one JSON file per local day
 ```
 
@@ -70,8 +70,7 @@ Two entrypoints share the same modules: the webhook (`vercel.py`) and the schedu
 - **Chart hours** — every hour is resolved in `MARKET_TIMEZONE` (`Europe/Amsterdam`, defined in `api/hourly_prices/model.py`), never in the timezone of the host: Vercel runs in UTC, so `datetime.now().astimezone()` used to shift the labels *and* the grey/green split by the DST offset. `APIResponse.get_today_prices()` filters on the same zone.
 - **Charts** — `/chart` renders *today's* hours only (00:00–23:59) as a JPEG drawn with Pillow, delivered with `sendPhoto` (`send_telegram_photo`) so it renders inline; bar top corners are rounded. The cheapest and the most expensive bar print their value above the bar (`_draw_extreme_labels`), and `_axis_max` adds `Y_HEADROOM_RATIO` headroom so that label stays inside the plot. A bar is `#d0d0d0` only once its whole hour has elapsed, otherwise `#4caf50`. Text uses Pillow's bundled default font (`ImageFont.load_default(size=...)`), so no system font is required.
 - **Storage** — an existing day file is only rewritten when the new data has *more* entries, so recorded hours are never overwritten. `data/` resolves relative to the working directory, so run the CLI from the repo root.
-- **Allowlist** — an empty allowlist denies everyone; `TELEGRAM_CHAT_ID` or `TELEGRAM_ALLOWED_CHAT_IDS` must be set for commands to work.
-- **Daily digest** — `/api/digest` is triggered by an *external* scheduler (hourly), not by Vercel cron, and only sends when the `MARKET_TIMEZONE` hour equals `DIGEST_HOUR` (default 6), so DST is handled in code rather than by the caller. It refuses to run (`503`) when `DIGEST_SECRET` is unset and requires `X-Digest-Secret`; subscribers live in Upstash Redis (Vercel is read-only) and are intersected with the allowlist before sending. `/digest` previews the message without touching the store.
+- **Daily digest** — `/api/digest` is triggered by an *external* scheduler (hourly), not by Vercel cron, and only sends when the `MARKET_TIMEZONE` hour equals `DIGEST_HOUR` (default 6), so DST is handled in code rather than by the caller. It refuses to run (`503`) when `DIGEST_SECRET` is unset and requires `X-Digest-Secret`; subscribers live in Upstash Redis (Vercel is read-only). `/digest` previews the message without touching the store.
 - **Dependencies** — Vercel and CI build with uv; run `uv sync` after editing deps so `uv.lock` stays in sync.
 
 ## Configuration
@@ -81,8 +80,6 @@ Read from the environment at runtime (local `.env` is loaded when `python-dotenv
 | Variable | Required | Description |
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | yes | Bot token from [@BotFather](https://t.me/BotFather) |
-| `TELEGRAM_CHAT_ID` | yes | Fallback chat id for outgoing messages; also the default allowlist |
-| `TELEGRAM_ALLOWED_CHAT_IDS` | no | Comma-separated chat ids the webhook may answer |
 | `TELEGRAM_WEBHOOK_SECRET` | recommended | Echoed by Telegram in `X-Telegram-Bot-Api-Secret-Token` |
 | `UPSTASH_REDIS_REST_URL` | for the digest | Upstash Redis REST endpoint storing the digest subscribers |
 | `UPSTASH_REDIS_REST_TOKEN` | for the digest | Upstash Redis REST token paired with the URL |
