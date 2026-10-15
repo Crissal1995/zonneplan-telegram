@@ -1,0 +1,23 @@
+# The Infinity data source polls the bot's analytics endpoint over HTTP.
+#
+# ANALYTICS_BASE_URL and ANALYTICS_SECRET are expanded by Grafana from the container
+# environment (see docker-compose.yaml). allowedHosts is required as soon as custom
+# headers are configured, otherwise Infinity refuses to call the endpoint.
+apiVersion: 1
+
+deleteDatasources:
+  - name: Zonneplan Analytics
+    orgId: 1
+
+datasources:
+  - name: Zonneplan Analytics
+    uid: zonneplan-analytics
+    type: yesoreyeram-infinity-datasource
+    access: proxy
+    jsonData:
+      url: ${ANALYTICS_BASE_URL}
+      allowedHosts:
+        - ${ANALYTICS_BASE_URL}
+      httpHeaderName1: X-Analytics-Secret
+    secureJsonData:
+      httpHeaderValue1: ${ANALYTICS_SECRET}

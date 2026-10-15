@@ -19,6 +19,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pytest>=8.4.2",
     "python-dotenv>=1.2.3",
     "ruff>=0.16.9",
     "ty>=0.0.84",
@@ -41,3 +42,14 @@ ignore = [
     "COM812", # Comma rule conflicting with `ruff format`
     "D", # Docstring rules
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101", # `assert` is the pytest idiom
+    "S105", # fake credentials in fixtures are not secrets
+    "S106", # fake credentials in fixtures are not secrets
+    "PLR2004", # bare numbers are the point of an assertion
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

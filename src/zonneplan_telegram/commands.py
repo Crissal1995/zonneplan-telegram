@@ -51,6 +51,10 @@ BOT_COMMANDS: list[tuple[str, str]] = [
 ]
 
 
+# Analytics bucket for a slash command the bot does not implement.
+UNKNOWN_COMMAND = "unknown"
+
+
 def parse_command(text: str) -> str | None:
     """
     Extracts a normalized command from a message text.

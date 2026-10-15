@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from loguru import logger
 
+from zonneplan_telegram.analytics import record_digest
 from zonneplan_telegram.api.hourly_prices import get_zonneplan_hourly_prices
 from zonneplan_telegram.subscriptions import get_subscribers
 from zonneplan_telegram.telegram import send_telegram_message
@@ -31,4 +32,5 @@ def send_daily_digest() -> int:
     for chat_id in sorted(recipients):
         send_telegram_message(digest, chat_id=chat_id)
     logger.info("Sent the daily digest to {} chat(s).", len(recipients))
+    record_digest(len(recipients))
     return len(recipients)
