@@ -10,7 +10,7 @@ when the chart is generated on a UTC server such as Vercel.
 
 from __future__ import annotations
 
-import datetime
+import datetime as dt
 import math
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple, cast
@@ -124,7 +124,7 @@ def _draw_grid(draw: ImageDraw.ImageDraw, font: FreeTypeFont, plot: _Plot) -> No
 
 
 def _draw_bars(draw: ImageDraw.ImageDraw, prices: Prices, plot: _Plot) -> None:
-    now = datetime.datetime.now(MARKET_TIMEZONE)
+    now = dt.datetime.now(MARKET_TIMEZONE)
     slot = plot.width / len(prices)
     width = slot * BAR_WIDTH_RATIO
     baseline = MARGIN_TOP + plot.height

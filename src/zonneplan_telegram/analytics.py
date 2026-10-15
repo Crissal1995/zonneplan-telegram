@@ -27,7 +27,7 @@ shift the daily and hourly aggregates by the DST offset.
 
 from __future__ import annotations
 
-import datetime
+import datetime as dt
 import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -117,7 +117,7 @@ def build_summary(
 
     snapshot = _fetch(days=days, weeks=weeks, months=months, top_users=top_users)
     payload: dict[str, object] = {
-        "generated_at": datetime.datetime.now(datetime.UTC).isoformat(),
+        "generated_at": dt.datetime.now(dt.UTC).isoformat(),
         "window": {"days": days, "weeks": weeks, "months": months},
         "totals": _totals_row(snapshot),
         "daily": _daily_rows(snapshot),
@@ -132,9 +132,9 @@ def build_summary(
     return payload
 
 
-def _now() -> datetime.datetime:
+def _now() -> dt.datetime:
     """Returns the current time in the market timezone the bot reports in."""
-    return datetime.datetime.now(MARKET_TIMEZONE)
+    return dt.datetime.now(MARKET_TIMEZONE)
 
 
 def _daily_key(month: str) -> str:
@@ -160,7 +160,7 @@ def _user_key(user_id: str) -> str:
 # --- write path -------------------------------------------------------------------------
 
 
-def _event_commands(event: CommandEvent, now: datetime.datetime) -> list[list[str]]:
+def _event_commands(event: CommandEvent, now: dt.datetime) -> list[list[str]]:
     """Builds the Redis commands that fold one event into the aggregates."""
     day = now.date().isoformat()
     month = day[:7]
@@ -184,7 +184,7 @@ def _event_commands(event: CommandEvent, now: datetime.datetime) -> list[list[st
     return commands
 
 
-def _event_fields(event: CommandEvent, now: datetime.datetime) -> list[str]:
+def _event_fields(event: CommandEvent, now: dt.datetime) -> list[str]:
     """Renders the fields of the raw event appended to the stream."""
     return [
         "ts",
@@ -208,7 +208,7 @@ def _user_commands(
     day: str,
     month: str,
     week: str,
-    now: datetime.datetime,
+    now: dt.datetime,
 ) -> list[list[str]]:
     """Builds the Redis commands that record the activity of one user."""
     user_id = str(event.user_id)
@@ -325,24 +325,24 @@ def _user_profiles(user_ids: list[str]) -> dict[str, dict[str, str]]:
     return {user_id: _as_mapping(result) for user_id, result in zip(user_ids, results, strict=True)}
 
 
-def _recent_days(today: datetime.date, count: int) -> list[str]:
+def _recent_days(today: dt.date, count: int) -> list[str]:
     """Returns the last ``count`` local dates, oldest first."""
-    return [(today - datetime.timedelta(days=offset)).isoformat() for offset in range(count - 1, -1, -1)]
+    return [(today - dt.timedelta(days=offset)).isoformat() for offset in range(count - 1, -1, -1)]
 
 
-def _recent_weeks(today: datetime.date, count: int) -> list[str]:
+def _recent_weeks(today: dt.date, count: int) -> list[str]:
     """Returns the last ``count`` ISO weeks, oldest first."""
-    monday = today - datetime.timedelta(days=today.weekday())
-    return [_week_label(monday - datetime.timedelta(weeks=offset)) for offset in range(count - 1, -1, -1)]
+    monday = today - dt.timedelta(days=today.weekday())
+    return [_week_label(monday - dt.timedelta(weeks=offset)) for offset in range(count - 1, -1, -1)]
 
 
-def _week_label(day: datetime.date) -> str:
+def _week_label(day: dt.date) -> str:
     """Formats a date as the ISO week it belongs to, ``YYYY-Www``."""
     iso_week = day.isocalendar()
     return f"{iso_week.year}-W{iso_week.week:02d}"
 
 
-def _recent_months(today: datetime.date, count: int) -> list[str]:
+def _recent_months(today: dt.date, count: int) -> list[str]:
     """Returns the last ``count`` months, oldest first."""
     index = today.year * 12 + today.month - 1
     return [_month_label(index - offset) for offset in range(count - 1, -1, -1)]
@@ -425,7 +425,7 @@ def _digest_rows(snapshot: _Snapshot) -> list[dict[str, object]]:
 def _week_start(week: str) -> str:
     """Returns the ISO date of the Monday that opens an ``YYYY-Www`` week."""
     year, _, number = week.partition("-W")
-    return datetime.date.fromisocalendar(int(year), int(number), 1).isoformat()
+    return dt.date.fromisocalendar(int(year), int(number), 1).isoformat()
 
 
 def _iso_midnight(day: str) -> str:
@@ -448,7 +448,7 @@ def _iso_timestamp(value: str | None) -> str:
     """Converts a stored epoch-second string into an ISO-8601 instant."""
     if not value or not value.isdigit():
         return ""
-    return datetime.datetime.fromtimestamp(int(value), tz=datetime.UTC).isoformat()
+    return dt.datetime.fromtimestamp(int(value), tz=dt.UTC).isoformat()
 
 
 # --- cache ------------------------------------------------------------------------------
