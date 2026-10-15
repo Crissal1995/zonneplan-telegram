@@ -9,7 +9,7 @@
 # (AGPL-3.0, MIT and Apache-2.0 respectively).
 services:
   grafana:
-    image: grafana/grafana:13.0.11-slim@sha256:4b9a8713b96e40bfc7e4a37346d9bdca2f36c92e342c6bca32df1db2a225f491
+    image: grafana/grafana:13.2.4-slim@sha256:e1b9840daaea5ebbe9ac585257ed88cf7ea569d28d5058231b0778f8898ef736
     restart: unless-stopped
     ports:
       - "3000:3000"
