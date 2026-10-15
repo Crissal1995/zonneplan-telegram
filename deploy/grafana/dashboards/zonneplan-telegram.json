@@ -1,0 +1,476 @@
+{
+  "uid": "zonneplan-telegram-analytics",
+  "title": "Zonneplan Telegram Bot",
+  "tags": ["zonneplan", "telegram"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1h",
+  "editable": true,
+  "time": { "from": "now-30d", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Unique users (all time)",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "table",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "totals",
+          "columns": [{ "selector": "users", "text": "Unique users", "type": "number" }],
+          "filters": [],
+          "json_options": { "root_is_not_array": true, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Commands (all time)",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "table",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "totals",
+          "columns": [{ "selector": "commands", "text": "Commands", "type": "number" }],
+          "filters": [],
+          "json_options": { "root_is_not_array": true, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed commands (all time)",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "table",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "totals",
+          "columns": [{ "selector": "errors", "text": "Errors", "type": "number" }],
+          "filters": [],
+          "json_options": { "root_is_not_array": true, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Digest messages sent (all time)",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "table",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "totals",
+          "columns": [{ "selector": "digest_sent", "text": "Digest messages", "type": "number" }],
+          "filters": [],
+          "json_options": { "root_is_not_array": true, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Unique users per day",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1, "showPoints": "never" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom", "calcs": [] },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "timeseries",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "daily",
+          "columns": [
+            { "selector": "time", "text": "time", "type": "timestamp", "timestampFormat": "2006-01-02T15:04:05Z07:00" },
+            { "selector": "users", "text": "Unique users", "type": "number" }
+          ],
+          "filters": [],
+          "json_options": { "root_is_not_array": false, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Active users per week / month",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 5, "showPoints": "auto" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": [] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "timeseries",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "weekly",
+          "columns": [
+            { "selector": "time", "text": "time", "type": "timestamp", "timestampFormat": "2006-01-02T15:04:05Z07:00" },
+            { "selector": "users", "text": "WAU", "type": "number" }
+          ],
+          "filters": [],
+          "json_options": { "root_is_not_array": false, "columnar": false }
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "timeseries",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "monthly",
+          "columns": [
+            { "selector": "time", "text": "time", "type": "timestamp", "timestampFormat": "2006-01-02T15:04:05Z07:00" },
+            { "selector": "users", "text": "MAU", "type": "number" }
+          ],
+          "filters": [],
+          "json_options": { "root_is_not_array": false, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Commands and failures per day",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 0, "showPoints": "never" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": [] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "timeseries",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "daily",
+          "columns": [
+            { "selector": "time", "text": "time", "type": "timestamp", "timestampFormat": "2006-01-02T15:04:05Z07:00" },
+            { "selector": "commands", "text": "Commands", "type": "number" },
+            { "selector": "errors", "text": "Failures", "type": "number" }
+          ],
+          "filters": [],
+          "json_options": { "root_is_not_array": false, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Commands by command (all time)",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-GrYlRd" },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "table",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "commands",
+          "columns": [
+            { "selector": "command", "text": "Command", "type": "string" },
+            { "selector": "count", "text": "Commands", "type": "number" }
+          ],
+          "filters": [],
+          "json_options": { "root_is_not_array": false, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "barchart",
+      "title": "Peak hours (commands per hour, last 30 days)",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" },
+        "overrides": []
+      },
+      "options": {
+        "xField": "hour",
+        "orientation": "vertical",
+        "showValue": "never",
+        "stacking": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "barRadius": 0,
+        "fullHighlight": false,
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom", "calcs": [] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "table",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "hourly",
+          "columns": [
+            { "selector": "hour", "text": "hour", "type": "string" },
+            { "selector": "count", "text": "Commands", "type": "number" }
+          ],
+          "filters": [],
+          "json_options": { "root_is_not_array": false, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Digest messages per day",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1, "showPoints": "never" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom", "calcs": [] },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "timeseries",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "digest",
+          "columns": [
+            { "selector": "time", "text": "time", "type": "timestamp", "timestampFormat": "2006-01-02T15:04:05Z07:00" },
+            { "selector": "sent", "text": "Digest messages", "type": "number" }
+          ],
+          "filters": [],
+          "json_options": { "root_is_not_array": false, "columnar": false }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Top users",
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 28 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "First seen" },
+            "properties": [{ "id": "unit", "value": "dateTimeAsIso" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Last seen" },
+            "properties": [{ "id": "unit", "value": "dateTimeAsIso" }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": { "show": false, "reducer": ["sum"], "countRows": false, "fields": "" },
+        "sortBy": [{ "displayName": "Commands", "desc": true }]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "zonneplan-analytics" },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "table",
+          "url": "/api/analytics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "users",
+          "columns": [
+            { "selector": "user_id", "text": "User id", "type": "number" },
+            { "selector": "username", "text": "Username", "type": "string" },
+            { "selector": "commands", "text": "Commands", "type": "number" },
+            { "selector": "first_seen", "text": "First seen", "type": "timestamp", "timestampFormat": "2006-01-02T15:04:05Z07:00" },
+            { "selector": "last_seen", "text": "Last seen", "type": "timestamp", "timestampFormat": "2006-01-02T15:04:05Z07:00" }
+          ],
+          "filters": [],
+          "json_options": { "root_is_not_array": false, "columnar": false }
+        }
+      ]
+    }
+  ]
+}

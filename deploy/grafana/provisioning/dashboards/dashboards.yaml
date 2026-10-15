@@ -1,0 +1,14 @@
+# Loads every dashboard JSON found in the mounted /var/lib/grafana/dashboards folder.
+apiVersion: 1
+
+providers:
+  - name: zonneplan-telegram
+    orgId: 1
+    folder: Zonneplan Telegram
+    folderUid: zonneplan-telegram
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

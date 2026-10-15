@@ -23,6 +23,7 @@ name = "jactionlint"
 entry = "jactionlint"
 language = "system"
 types = ["yaml"]
+files = { "glob" = ["**/.github/workflows/*.yml", "**/.github/workflows/*.yaml"] }
 priority = 1
 
 [[repos.hooks]]
