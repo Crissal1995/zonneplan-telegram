@@ -19,10 +19,7 @@ Python >= 3.12, managed with [uv](https://docs.astral.sh/uv/).
 uv sync                     # install / refresh dependencies (uv.lock)
 uv run update-prices        # run the scheduled CLI from the repo root
 uv run set-webhook <url>    # register the Telegram webhook (… --info, --delete)
-
-uv tool install tox --with tox-uv
-tox                         # run every quality gate
-tox -e fix                  # apply automatic fixes
+uv run pytest               # run the test suite (offline, no credentials needed)
 ```
 
 Quality gates (also enforced by CI, **run before finishing any change**):
@@ -31,6 +28,7 @@ Quality gates (also enforced by CI, **run before finishing any change**):
 uv run ruff check
 uv run ruff format --check
 uv run ty check
+uv run pytest
 ```
 
 ## Architecture
@@ -51,6 +49,7 @@ src/zonneplan_telegram/
   telegram/                     # sendMessage / sendPhoto clients, models, set-webhook CLI
 data/                           # archived price history, one JSON file per local day
 deploy/grafana/                 # self-hosted Grafana (FOSS) for the analytics dashboard
+tests/                          # pytest suite (offline: faked Upstash, direct route calls)
 ```
 
 Two entrypoints share the same modules: the webhook (`vercel.py`) and the scheduled CLI (`cli.py`).

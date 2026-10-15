@@ -230,29 +230,53 @@ Price history is written to `data/`, relative to the current working directory, 
 
 ## Development
 
-Quality gates are managed with [tox](https://tox.wiki) and the `tox-uv` plugin:
-
-| Environment | Purpose | Commands |
-| --- | --- | --- |
-| `tox -e lint` | Linting | `ruff check` |
-| `tox -e format` | Formatting check | `ruff format --check` |
-| `tox -e type` | Type checking | `ty check` |
-| `tox -e fix` | Auto-fixes | `ruff format`, `ruff check --fix`, `ty check --fix` |
-| `tox` | All three checks | `lint`, `format`, `type` |
+The quality gates are the same ones CI runs, in the same order:
 
 ```bash
-uv tool install tox --with tox-uv
-tox          # run every qualification environment
-tox -e fix   # apply automatic fixes
+uv run ruff format --check   # formatting
+uv run ruff check            # linting
+uv run ty check              # typing
+uv run pytest                # test suite
 ```
 
-Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring copyright rules (`CPY`), the comma rule that conflicts with the formatter (`COM812`) and docstring rules (`D`).
+`uv run ruff format` and `uv run ruff check --fix` apply the fixes.
+
+Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring copyright rules (`CPY`), the comma rule that conflicts with the formatter (`COM812`) and docstring rules (`D`); the suite additionally ignores `S101` (`assert`) and `PLR2004`.
+
+### Tests
+
+`tests/` runs **offline**: the Upstash transport is faked and the route functions are called directly, so no credentials and no Redis are involved. `uv run pytest` covers the Redis client (pipeline request shape, error replies, missing credentials), the analytics aggregates (the exact write commands, failure counting, the rendered dashboard payload) and the HTTP layer (command dispatch, recording, and the `503` / `401` / `200` behaviour of `/api/analytics`).
+
+### Trying the dashboard locally
+
+Grafana shows "No data" until the app actually answers `/api/analytics`, which means the code has to be deployed (or served locally) and at least one command has to have been recorded — there is no backfill from the archived price history. To exercise the whole chain without touching production:
+
+1. Point `.env` at a **scratch** Upstash database: the local webhook writes real events.
+2. Serve the app on the host (the `--with uvicorn` flag installs it for that run only):
+
+   ```bash
+   uv run --with uvicorn uvicorn zonneplan_telegram.vercel:app --port 8000
+   ```
+
+3. In `deploy/grafana/.env` set `ANALYTICS_BASE_URL=http://host.docker.internal:8000` and an `ANALYTICS_SECRET` that matches, then `docker compose up -d && docker compose restart grafana` (the provisioning is only re-read on start).
+4. Generate events by POSTing synthetic updates — no Telegram needed:
+
+   ```bash
+   curl -X POST http://localhost:8000/api/webhook -H "Content-Type: application/json" \
+     -d '{"update_id":1,"message":{"chat":{"id":1},"text":"/help","from":{"id":1,"username":"tester"}}}'
+   ```
+
+5. Reload the dashboard. Add a matching `ANALYTICS_SECRET` to the local environment so the guard accepts the request.
+
+`host.docker.internal` resolves to the host from inside the container on Windows and macOS. On Linux, add `extra_hosts: ["host.docker.internal:host-gateway"]` to the `grafana` service.
+
+A Vercel **preview** deployment can be used the same way, but preview URLs sit behind Vercel Authentication by default and answer `401 Protected deployment` to Grafana — either turn *Deployment Protection* off for previews or send the `x-vercel-protection-bypass` bypass header from the data source.
 
 ### Continuous integration
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `qualify.yaml` | `pull_request` | Runs `tox` (lint, format check, type check) |
+| `qualify.yaml` | `pull_request` | Runs `ruff format --diff`, `ruff check`, `ty check` and `pytest` |
 | `push.yaml` | `workflow_dispatch` | Runs `update-prices`, then commits the new data through an auto-merged pull request |
 
 `push.yaml` needs the `PAT` secret (a token with `repo` scope; the job already declares `contents: write` and `pull-requests: write`). It runs `update-prices`, closes any still-open pull request on the `automated-data-update` branch, opens a fresh one with `peter-evans/create-pull-request`, approves and squash-merges it with `--admin`. The approval and merge steps are skipped when no data changed and therefore no pull request was created.
@@ -286,7 +310,8 @@ Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring cop
 │       ├── models.py             # minimal Update / Message / Chat models
 │       └── set_webhook.py        # `set-webhook` CLI (setWebhook + setMyCommands)
 ├── deploy/grafana/               # self-hosted Grafana: compose, provisioning, dashboard
-├── pyproject.toml                # metadata, deps, vercel entrypoint, ruff & tox config
+├── tests/                        # pytest suite (offline: faked Upstash, direct route calls)
+├── pyproject.toml                # metadata, deps, vercel entrypoint, ruff & pytest config
 ├── vercel.json                   # region, duration and bundle exclusions
 └── uv.lock
 ```
