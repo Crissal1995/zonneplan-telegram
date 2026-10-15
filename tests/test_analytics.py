@@ -7,7 +7,7 @@ and the payload the Grafana dashboard consumes is asserted directly.
 
 from __future__ import annotations
 
-import datetime
+import datetime as dt
 from typing import TYPE_CHECKING
 
 from zonneplan_telegram import analytics
@@ -22,7 +22,7 @@ USER_KEY_PREFIX = f"{analytics.PREFIX}:user"
 
 def _today() -> str:
     """Returns today in the market timezone, the way the module buckets events."""
-    return datetime.datetime.now(MARKET_TIMEZONE).date().isoformat()
+    return dt.datetime.now(MARKET_TIMEZONE).date().isoformat()
 
 
 def _capture(monkeypatch: pytest.MonkeyPatch) -> list[list[list[str]]]:

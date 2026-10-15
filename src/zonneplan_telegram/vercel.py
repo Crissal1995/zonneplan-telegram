@@ -8,7 +8,7 @@ synchronously so the response is complete before the function returns.
 
 from __future__ import annotations
 
-import datetime
+import datetime as dt
 import importlib.util
 import os
 import secrets
@@ -178,7 +178,7 @@ def send_digest(
         detail = "Invalid digest secret"
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
-    local_hour = datetime.datetime.now(MARKET_TIMEZONE).hour
+    local_hour = dt.datetime.now(MARKET_TIMEZONE).hour
     if not force and local_hour != _digest_hour():
         logger.info("Skipping the digest: local hour {} is not the digest hour.", local_hour)
         return {"ok": True, "skipped": True, "sent": 0}

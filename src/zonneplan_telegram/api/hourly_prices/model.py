@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
@@ -15,14 +15,14 @@ PriceEntry = dict[Literal["amount"], float]
 DIGEST_WINDOW_HOURS = 5
 
 
-def _now() -> datetime.datetime:
+def _now() -> dt.datetime:
     """Returns the current instant in the price market timezone."""
-    return datetime.datetime.now(MARKET_TIMEZONE)
+    return dt.datetime.now(MARKET_TIMEZONE)
 
 
 class Price(BaseModel):
-    start_date: datetime.datetime
-    end_date: datetime.datetime
+    start_date: dt.datetime
+    end_date: dt.datetime
     price_tax_included: PriceEntry
 
     @property
@@ -77,7 +77,7 @@ class APIResponse(BaseModel):
         """
         Returns a list of Price objects for tomorrow, or an empty list if no prices are available.
         """
-        tomorrow = (_now() + datetime.timedelta(days=1)).date()
+        tomorrow = (_now() + dt.timedelta(days=1)).date()
         return [item for item in self.prices if item.start_date.astimezone(MARKET_TIMEZONE).date() == tomorrow]
 
     def get_cheapest_window(self, hours: int) -> Prices | None:
@@ -133,7 +133,7 @@ class APIResponse(BaseModel):
         Renders tomorrow's summary, or a notice when the prices are not published yet.
         """
         tomorrow_prices = self.get_tomorrow_prices()
-        tomorrow_local = _now() + datetime.timedelta(days=1)
+        tomorrow_local = _now() + dt.timedelta(days=1)
 
         message_lines = [
             "⚡ **Zonneplan - Tomorrow's prices** ⚡",
