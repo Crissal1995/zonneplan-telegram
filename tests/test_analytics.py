@@ -114,6 +114,7 @@ def test_record_digest_counts_the_delivered_messages(monkeypatch: pytest.MonkeyP
     analytics.record_digest(3)
 
     assert ["HINCRBY", f"{DAILY_KEY_PREFIX}:{today[:7]}", f"d:{today}:ds", "3"] in calls[0]
+    assert ["HINCRBY", analytics.TOTALS_KEY, "digest", "3"] in calls[0]
 
 
 def _install_summary_fakes(monkeypatch: pytest.MonkeyPatch, today: str) -> None:
@@ -137,7 +138,9 @@ def _install_summary_fakes(monkeypatch: pytest.MonkeyPatch, today: str) -> None:
         replies: list[object] = []
         for command in commands:
             if command[0] == "HGETALL":
-                replies.append(hashes.get(command[1], {}))
+                # Upstash serialises HGETALL as a flat ["field", "value", ...] array, not an object.
+                fields = hashes.get(command[1], {})
+                replies.append([item for pair in fields.items() for item in pair])
             elif command[0] == "SCARD":
                 replies.append(counters.get(command[1], 0))
             elif command[0] == "ZREVRANGE":

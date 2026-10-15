@@ -92,6 +92,7 @@ def record_digest(sent: int) -> None:
             [
                 ["HINCRBY", _daily_key(day[:7]), f"d:{day}:ds", str(sent)],
                 ["EXPIRE", _daily_key(day[:7]), str(HISTORY_TTL_SECONDS)],
+                ["HINCRBY", TOTALS_KEY, "digest", str(sent)],
             ]
         )
     except Exception:  # noqa: BLE001
@@ -496,10 +497,17 @@ def _as_list(value: object) -> list[object]:
 
 
 def _as_mapping(value: object) -> dict[str, str]:
-    """Returns a Redis hash reply as a ``str -> str`` mapping, defaulting to empty."""
-    if not isinstance(value, dict):
-        return {}
-    return {str(key): str(item) for key, item in value.items()}
+    """
+    Returns a Redis hash reply as a ``str -> str`` mapping, defaulting to empty.
+
+    Upstash serialises ``HGETALL`` as a flat array of alternating field and value
+    (``["field", "value", ...]``) instead of a JSON object, so both shapes are accepted.
+    """
+    if isinstance(value, dict):
+        return {str(key): str(item) for key, item in value.items()}
+    if isinstance(value, list) and len(value) % 2 == 0:
+        return {str(key): str(item) for key, item in zip(value[0::2], value[1::2], strict=True)}
+    return {}
 
 
 def _scards(replies: Iterator[object], keys: Sequence[str]) -> dict[str, int]:
