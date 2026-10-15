@@ -84,7 +84,7 @@ docker compose up -d
 # http://localhost:3000 → "Zonneplan Telegram" → "Zonneplan Telegram Bot"
 ```
 
-The compose file starts Grafana with the Infinity plugin pre-installed, provisions the data source from `provisioning/` (base URL, allowed host and the `X-Analytics-Secret` header all come from the container environment) and loads `dashboards/zonneplan-telegram.json`. The dashboard shows unique users per day / week / month, the command breakdown, peak hours, failures, digest deliveries and the top users, and refreshes hourly. Panels can be edited in the UI — the file is re-read every 30 seconds, and `allowUiUpdates` is on, so changes persist.
+The compose file starts Grafana with the Infinity plugin pre-installed, provisions the data source from `provisioning/` (the base URL and the `X-Analytics-Secret` header both come from the container environment) and loads `dashboards/zonneplan-telegram.json`. The dashboard shows unique users per day / week / month, the command breakdown, peak hours, failures, digest deliveries and the top users, and refreshes hourly. Panels can be edited in the UI — the file is re-read every 30 seconds, and `allowUiUpdates` is on, so changes persist.
 
 ## How it works
 

@@ -1,8 +1,17 @@
 # The Infinity data source polls the bot's analytics endpoint over HTTP.
 #
+# The base URL MUST live in Grafana's top-level `url` field. Infinity reads it from the data
+# source instance settings (see LoadSettings in pkg/models/settings.go) and ignores
+# `jsonData.url` completely. Without it the relative query URLs (/api/analytics) never get
+# resolved and every query fails the allowed-hosts check with "requested URL not allowed".
+#
+# `allowedHosts` is deliberately omitted: a configured base URL satisfies
+# InfinitySettings.DoesAllowedHostsRequired(), and an empty allowed list accepts the request.
+# Defining it here instead would also require env interpolation inside a list, which is not
+# documented to work the way the scalar fields are.
+#
 # ANALYTICS_BASE_URL and ANALYTICS_SECRET are expanded by Grafana from the container
-# environment (see docker-compose.yaml). allowedHosts is required as soon as custom
-# headers are configured, otherwise Infinity refuses to call the endpoint.
+# environment (see docker-compose.yaml).
 apiVersion: 1
 
 deleteDatasources:
@@ -14,10 +23,8 @@ datasources:
     uid: zonneplan-analytics
     type: yesoreyeram-infinity-datasource
     access: proxy
+    url: ${ANALYTICS_BASE_URL}
     jsonData:
-      url: ${ANALYTICS_BASE_URL}
-      allowedHosts:
-        - ${ANALYTICS_BASE_URL}
       httpHeaderName1: X-Analytics-Secret
     secureJsonData:
       httpHeaderValue1: ${ANALYTICS_SECRET}

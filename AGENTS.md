@@ -83,8 +83,9 @@ Two entrypoints share the same modules: the webhook (`vercel.py`) and the schedu
 - Bucketing uses `MARKET_TIMEZONE` (same trap as the charts): keying on the host clock would shift the daily and hourly aggregates by the DST offset on UTC Vercel.
 - Only slash commands are recorded; unknown ones land in the `unknown` bucket (`UNKNOWN_COMMAND` in `commands.py`) and plain text messages are ignored.
 - `build_summary()` caches its payload in Redis for 60 s (`…:analytics:summary`) and reads everything in two pipelines, because a dashboard refresh costs ~80 commands against the Upstash quota.
+- **Upstash serialises `HGETALL` as a flat array** (`["field", "value", …]`), not as a JSON object — `ZREVRANGE … WITHSCORES` is flat too. `analytics._as_mapping()` accepts both shapes, and the test fake deliberately answers in the flat shape so a dict-only parser cannot come back: it silently yields empty hashes, which reads as "every counter is 0" (the set-backed user counts keep working, since `SCARD` returns an int).
 - The endpoint returns arrays for the trend datasets plus an object for `totals`; the Grafana panels therefore set `json_options.root_is_not_array` on the totals queries only.
-- The datasource is provisioned with custom headers, so Infinity **requires** `allowedHosts` to be set. `deploy/**` is excluded from the Vercel bundle in `vercel.json`.
+- Infinity reads the data source base URL from Grafana's **top-level `url` field** — `jsonData.url` is ignored (`LoadSettings`), and a query that stays relative is rejected by the allowed-hosts check (`requested URL not allowed`). A configured base URL makes `allowedHosts` unnecessary, so the provisioning omits it. `deploy/**` is excluded from the Vercel bundle in `vercel.json`.
 
 ## Configuration
 
