@@ -36,6 +36,56 @@ A subscriber receives one message per day at **06:00 Europe/Amsterdam** with the
 - `GET /api/digest?force=1` (with a valid secret) bypasses the hour guard to test delivery. `GET /api/digest` returns `{"ok": true, "skipped": true, "sent": 0}` outside the digest hour.
 - When nobody is subscribed the endpoint stays silent and returns `{"ok": true, "skipped": false, "sent": 0}`.
 
+## Usage analytics
+
+Every command the webhook answers is recorded, so the bot's adoption can be charted without adding any infrastructure: the aggregates live in the same Upstash Redis database that already stores the digest subscribers.
+
+| Recorded | Where |
+| --- | --- |
+| Raw events (timestamp, chat, user, command, success) | `zonneplan-telegram:analytics:events`, a stream capped at 10 000 entries |
+| Commands, failures and digest deliveries per day and per hour | `zonneplan-telegram:analytics:daily:<YYYY-MM>` |
+| All-time counters, including one per command | `zonneplan-telegram:analytics:totals` |
+| Unique users per day / week / month / all time | `zonneplan-telegram:analytics:users:day|week|month|all` |
+| Per-user profile (username, first/last seen) and ranking | `zonneplan-telegram:analytics:user:<id>`, `…:user-commands` |
+
+Days and hours are bucketed in `Europe/Amsterdam`, like the digest, so the numbers do not shift when Vercel runs on UTC. Slash commands the bot does not implement are counted in an `unknown` bucket; plain text messages are ignored.
+
+Recording is best effort: when the Upstash credentials are missing or Redis is unreachable, a warning is logged and the bot still replies. Note that **the raw Telegram user id and username are stored, so this is personal data** — treat the Redis database and the analytics endpoint accordingly.
+
+### The dashboard endpoint
+
+`GET /api/analytics` returns the aggregates as JSON for a dashboard:
+
+```json
+{
+  "generated_at": "2026-10-15T09:31:00+00:00",
+  "totals": { "users": 12, "commands": 438, "errors": 1, "digest_sent": 96 },
+  "daily": [{ "date": "2026-10-15", "time": "2026-10-15T00:00:00Z", "commands": 18, "errors": 0, "digest_sent": 3, "users": 4 }],
+  "weekly": [{ "week": "2026-W42", "time": "2026-10-12T00:00:00Z", "users": 9 }],
+  "monthly": [{ "month": "2026-10", "time": "2026-10-01T00:00:00Z", "users": 12 }],
+  "commands": [{ "command": "/pricenow", "count": 180 }],
+  "hourly": [{ "hour": 7, "count": 42 }],
+  "digest": [{ "date": "2026-10-15", "time": "2026-10-15T00:00:00Z", "sent": 3 }],
+  "users": [{ "user_id": 1234567, "username": "someone", "commands": 42, "first_seen": "2026-09-28T06:12:00+00:00", "last_seen": "2026-10-15T09:02:00+00:00" }]
+}
+```
+
+- The payload is cached in Redis for 60 seconds, so a dashboard may refresh often without draining the Upstash command quota.
+- It answers `503` while `ANALYTICS_SECRET` is unset and `401` when the secret does not match. Send it as `X-Analytics-Secret: <secret>` or as `Authorization: Bearer <secret>`.
+
+### Grafana dashboard
+
+The dashboard is [Grafana](https://grafana.com/oss/grafana/) (AGPL) with the [Infinity data source](https://github.com/grafana/grafana-infinity-datasource) (FOSS) reading the JSON endpoint. Everything ships in `deploy/grafana/` and needs no other service:
+
+```bash
+cd deploy/grafana
+cp .env.example .env      # set ANALYTICS_SECRET to the Vercel value
+docker compose up -d
+# http://localhost:3000 → "Zonneplan Telegram" → "Zonneplan Telegram Bot"
+```
+
+The compose file starts Grafana with the Infinity plugin pre-installed, provisions the data source from `provisioning/` (base URL, allowed host and the `X-Analytics-Secret` header all come from the container environment) and loads `dashboards/zonneplan-telegram.json`. The dashboard shows unique users per day / week / month, the command breakdown, peak hours, failures, digest deliveries and the top users, and refreshes hourly. Panels can be edited in the UI — the file is re-read every 30 seconds, and `allowUiUpdates` is on, so changes persist.
+
 ## How it works
 
 ```mermaid
@@ -54,6 +104,7 @@ Two entrypoints share the same building blocks.
 
 1. **Verify** — the `X-Telegram-Bot-Api-Secret-Token` header is compared with `TELEGRAM_WEBHOOK_SECRET`; updates that fail the check are dropped.
 2. **Dispatch** — `commands.py` maps the command to a handler that fetches the prices and replies in the chat that asked.
+3. **Record** — the answered command is folded into the Upstash analytics aggregates (see [Usage analytics](#usage-analytics)). A failure there is logged and swallowed.
 
 **`vercel.py` — the digest trigger (`GET|POST /api/digest`)**
 
@@ -91,8 +142,9 @@ The credentials are read from the environment at runtime:
 | `UPSTASH_REDIS_REST_TOKEN` | for the digest | Upstash Redis REST token paired with the URL |
 | `DIGEST_SECRET` | for the digest | Shared secret the scheduler sends back in the `X-Digest-Secret` header. The `/api/digest` trigger answers `503` while it is unset |
 | `DIGEST_HOUR` | no | Local hour (`Europe/Amsterdam`) the digest is delivered at. Defaults to `6` |
+| `ANALYTICS_SECRET` | for the dashboard | Shared secret the Grafana data source sends in `X-Analytics-Secret`. `/api/analytics` answers `503` while it is unset |
 
-The Upstash and `DIGEST_SECRET` variables are only needed for the daily digest.
+The Upstash variables are needed by the daily digest and by the analytics store; `DIGEST_SECRET` and `ANALYTICS_SECRET` only guard their respective endpoints.
 
 For local development, create a `.env` file in the repository root — it is loaded automatically when `python-dotenv` is installed (it is part of the `dev` dependency group):
 
@@ -102,6 +154,7 @@ TELEGRAM_WEBHOOK_SECRET=some-random-string
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-upstash-rest-token
 DIGEST_SECRET=some-other-random-string
+ANALYTICS_SECRET=yet-another-random-string
 ```
 
 Both `send_telegram_message()` and `send_telegram_photo()` take an explicit `chat_id`; their `bot_token` argument takes precedence over the environment.
@@ -111,7 +164,7 @@ Both `send_telegram_message()` and `send_telegram_photo()` take an explicit `cha
 The repository needs no build step: Vercel detects the FastAPI app from the `fastapi` dependency in `pyproject.toml`, and `[tool.vercel] entrypoint = "app:app"` points at the root-level `app.py`, which re-exports the FastAPI instance from the `src` layout (Vercel resolves that setting as a path relative to the project root, so it cannot reference `src/zonneplan_telegram/vercel.py` directly). Steps that have to be done once, outside the repository:
 
 1. **Import the project.** In the [Vercel dashboard](https://vercel.com/new), import the GitHub repository. Leave *Root Directory* at the repository root and keep the detected **FastAPI** framework preset.
-2. **Add environment variables.** In *Project Settings → Environment Variables*, add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` for the Production (and optionally Preview) environment.
+2. **Add environment variables.** In *Project Settings → Environment Variables*, add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` for the Production (and optionally Preview) environment, plus `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `DIGEST_SECRET` and `ANALYTICS_SECRET` for the digest and the analytics endpoint.
 3. **Deploy** and note the production URL, e.g. `https://zonneplan-telegram.vercel.app`.
 4. **Register the webhook** from a local checkout, once per deployment URL:
 
@@ -219,6 +272,8 @@ Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring cop
 │   ├── commands.py               # command handlers + Telegram menu metadata
 │   ├── digest.py                 # daily digest rendering + subscriber fan-out
 │   ├── subscriptions.py          # Upstash Redis subscriber store
+│   ├── analytics.py              # Upstash usage analytics (recording + dashboard summary)
+│   ├── upstash.py                # Upstash Redis REST client (commands + pipelines)
 │   ├── chart.py                  # Pillow JPEG bar chart
 │   ├── storage.py                # per-day JSON persistence
 │   ├── api/
@@ -230,6 +285,7 @@ Ruff is configured with `line-length = 120` and `select = ["ALL"]`, ignoring cop
 │       ├── __init__.py           # sendMessage / sendPhoto clients
 │       ├── models.py             # minimal Update / Message / Chat models
 │       └── set_webhook.py        # `set-webhook` CLI (setWebhook + setMyCommands)
+├── deploy/grafana/               # self-hosted Grafana: compose, provisioning, dashboard
 ├── pyproject.toml                # metadata, deps, vercel entrypoint, ruff & tox config
 ├── vercel.json                   # region, duration and bundle exclusions
 └── uv.lock

@@ -4,7 +4,7 @@
   "functions": {
     "app.py": {
       "maxDuration": 30,
-      "excludeFiles": "{data/**,.github/**,**/*.md}"
+      "excludeFiles": "{data/**,deploy/**,.github/**,**/*.md}"
     }
   }
 }

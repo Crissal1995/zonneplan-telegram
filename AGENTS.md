@@ -7,6 +7,7 @@ Guidance for AI coding agents working in this repository.
 `zonneplan-telegram` fetches the hourly electricity prices from the Zonneplan consumer API, answers Telegram commands through a webhook, and archives the price history as one JSON file per day.
 
 - **Webhook** — `app.py` → `src/zonneplan_telegram/vercel.py` (FastAPI, `POST /api/webhook`). Answers `/priceNow`, `/priceTomorrow`, `/chart`, `/digest`, `/subscribe`, `/unsubscribe` and `/help` on demand.
+- **Analytics** — the webhook folds every answered command into Upstash Redis (`analytics.py`), and `GET /api/analytics` serves the aggregates as JSON to the self-hosted Grafana dashboard in `deploy/grafana/`.
 - **Scheduled CLI** — `src/zonneplan_telegram/cli.py` (`update_prices()`). Fetches the prices and archives them to `data/`; run by the `push.yaml` GitHub Action, never by the webhook.
 - **Daily digest** — subscribers (`UPSTASH_REDIS_REST_URL`/`_TOKEN`) get a daily message at `DIGEST_HOUR` (06:00 `Europe/Amsterdam`); an external scheduler pings `GET|POST /api/digest` with the `X-Digest-Secret` header.
 
@@ -42,11 +43,14 @@ src/zonneplan_telegram/
   commands.py                   # command handlers + Telegram menu metadata
   digest.py                     # daily digest rendering + subscriber fan-out
   subscriptions.py              # Upstash Redis subscriber store (digest)
+  analytics.py                  # Upstash usage analytics: recording + dashboard summary
+  upstash.py                    # Upstash Redis REST client (commands + pipelines)
   chart.py                      # Pillow JPEG bar chart
   storage.py                    # per-day JSON persistence
   api/hourly_prices/            # HTTP calls + pydantic models + Markdown rendering
   telegram/                     # sendMessage / sendPhoto clients, models, set-webhook CLI
 data/                           # archived price history, one JSON file per local day
+deploy/grafana/                 # self-hosted Grafana (FOSS) for the analytics dashboard
 ```
 
 Two entrypoints share the same modules: the webhook (`vercel.py`) and the scheduled CLI (`cli.py`).
@@ -73,6 +77,16 @@ Two entrypoints share the same modules: the webhook (`vercel.py`) and the schedu
 - **Daily digest** — `/api/digest` is triggered by an *external* scheduler (hourly), not by Vercel cron, and only sends when the `MARKET_TIMEZONE` hour equals `DIGEST_HOUR` (default 6), so DST is handled in code rather than by the caller. It refuses to run (`503`) when `DIGEST_SECRET` is unset and requires `X-Digest-Secret`; subscribers live in Upstash Redis (Vercel is read-only). `/digest` previews the message without touching the store.
 - **Dependencies** — Vercel and CI build with uv; run `uv sync` after editing deps so `uv.lock` stays in sync.
 
+## Analytics
+
+- `upstash.py` owns the only Upstash transport: `redis_command()` for one command and `redis_pipeline()` for many in one HTTP round trip (POST to `<url>/pipeline`, replies come back as `{"result"|"error"}` per row). `subscriptions.py` and `analytics.py` both use it — never re-add a private `requests.post` to Upstash.
+- `analytics.py:record_command()` folds one event into the aggregates with a single pipeline, and `record_digest()` counts digest deliveries. Both swallow every error: analytics must never break a reply. They are called synchronously from the webhook, so they add one round trip of latency.
+- Bucketing uses `MARKET_TIMEZONE` (same trap as the charts): keying on the host clock would shift the daily and hourly aggregates by the DST offset on UTC Vercel.
+- Only slash commands are recorded; unknown ones land in the `unknown` bucket (`UNKNOWN_COMMAND` in `commands.py`) and plain text messages are ignored.
+- `build_summary()` caches its payload in Redis for 60 s (`…:analytics:summary`) and reads everything in two pipelines, because a dashboard refresh costs ~80 commands against the Upstash quota.
+- The endpoint returns arrays for the trend datasets plus an object for `totals`; the Grafana panels therefore set `json_options.root_is_not_array` on the totals queries only.
+- The datasource is provisioned with custom headers, so Infinity **requires** `allowedHosts` to be set. `deploy/**` is excluded from the Vercel bundle in `vercel.json`.
+
 ## Configuration
 
 Read from the environment at runtime (local `.env` is loaded when `python-dotenv` is installed):
@@ -85,6 +99,7 @@ Read from the environment at runtime (local `.env` is loaded when `python-dotenv
 | `UPSTASH_REDIS_REST_TOKEN` | for the digest | Upstash Redis REST token paired with the URL |
 | `DIGEST_SECRET` | for the digest | Shared secret the scheduler sends in `X-Digest-Secret`; `/api/digest` answers `503` while unset |
 | `DIGEST_HOUR` | no | Local hour (`Europe/Amsterdam`) the digest is delivered at (default `6`) |
+| `ANALYTICS_SECRET` | for the dashboard | Shared secret the Grafana data source sends in `X-Analytics-Secret` (a bearer token is accepted too); `/api/analytics` answers `503` while unset |
 
 ## Reference
 

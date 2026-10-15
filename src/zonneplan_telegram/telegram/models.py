@@ -5,7 +5,7 @@ Telegram sends a lot more fields per update; ``extra="ignore"`` keeps the parsin
 forward-compatible without modelling the full Bot API surface.
 """
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Chat(BaseModel):
@@ -16,13 +16,23 @@ class Chat(BaseModel):
     id: int
 
 
-class Message(BaseModel):
-    """The subset of a message that can carry a bot command."""
+class User(BaseModel):
+    """The subset of a Telegram user recorded by the analytics store."""
 
     model_config = ConfigDict(extra="ignore")
 
+    id: int
+    username: str | None = None
+
+
+class Message(BaseModel):
+    """The subset of a message that can carry a bot command."""
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
     chat: Chat
     text: str | None = None
+    from_: User | None = Field(default=None, alias="from")
 
 
 class Update(BaseModel):
