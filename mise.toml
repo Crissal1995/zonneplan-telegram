@@ -1,4 +1,4 @@
 [tools]
 gh = "latest"
-jactionlint = "2.3.0"
+jactionlint = "2.4.0"
 shellcheck = "latest"
