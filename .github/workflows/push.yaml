@@ -3,6 +3,13 @@ name: Update price history
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/push.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   update-prices:
@@ -16,8 +23,8 @@ jobs:
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:
-          client-id: ${{ vars.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          client-id: ${{ vars.APP_AUTOAPPROVAL_CLIENT_ID }}
+          private-key: ${{ secrets.APP_AUTOAPPROVAL_PRIVATE_KEY }}
           permission-pull-requests: write
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Compute the dated branch name
@@ -31,7 +38,12 @@ jobs:
         env:
           UV_FROZEN: 1
           UV_NO_DEV: 1
+      - name: Dry run if running on PR
+        if: github.event_name == 'pull_request'
+        id: dry-run
+        run: echo "value=true" >> "$GITHUB_OUTPUT"
       - name: Close existing pull requests on the same branch
+        if: steps.dry-run.outputs.value != 'true'
         shell: bash
         run: |
           gh pr list --head ${{ env.PR_BRANCH }} --state open --json number --jq '.[].number' |
@@ -44,6 +56,7 @@ jobs:
           COMMENT: >-
             :robot: _This pull request has been automatically closed because a new one has been created._
       - name: Create Pull Request for Data Updates
+        if: steps.dry-run.outputs.value != 'true'
         # The output of this step will be used to get the pull request number for approval and merging.
         # In case no data updates are found, the step will not create a pull request and the output will be empty.
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -56,12 +69,12 @@ jobs:
           base: main
           delete-branch: true
       - name: Approve pull request
-        if: steps.pr.outputs.pull-request-number != ''
+        if: steps.pr.outputs.pull-request-number != '' && steps.dry-run.outputs.value != 'true'
         run: gh pr review ${{ steps.pr.outputs.pull-request-number }} --approve --body "${{ env.COMMENT }}"
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
       - name: Enable auto-merge
-        if: steps.pr.outputs.pull-request-number != ''
+        if: steps.pr.outputs.pull-request-number != '' && steps.dry-run.outputs.value != 'true'
         run: gh pr merge ${{ steps.pr.outputs.pull-request-number }} --auto --squash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
