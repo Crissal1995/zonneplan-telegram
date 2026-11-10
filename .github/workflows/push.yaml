@@ -59,7 +59,7 @@ jobs:
         if: steps.dry-run.outputs.value != 'true'
         # The output of this step will be used to get the pull request number for approval and merging.
         # In case no data updates are found, the step will not create a pull request and the output will be empty.
-        uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8 # v8.1.2
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         id: pr
         with:
           commit-message: "chore(data): update price history"
