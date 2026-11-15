@@ -1,0 +1,61 @@
+---
+name: Approve workflow runs
+
+# GitHub parks a pull_request run in "action_required" when the pull request author
+# has no write access, which is the case for every pull request opened by a bot.
+# Workflows triggered by pull_request_target always run, so this one releases the
+# runs of branches inside this repository. Fork pull requests keep waiting for a
+# maintainer, in line with the repository approval policy. No pull request code is
+# ever checked out or executed here: the job only calls the API.
+on:
+  # jactionlint ignore=dangerous-triggers
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  approve-runs:
+    name: Approve workflow runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ vars.APP_AUTOAPPROVAL_CLIENT_ID }}
+          private-key: ${{ secrets.APP_AUTOAPPROVAL_PRIVATE_KEY }}
+          permission-actions: write
+      - name: Approve the pending runs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # The pull_request runs are created by the same event, so they can show up
+          # a moment later: poll for up to a minute before giving up.
+          for _ in {1..12}; do
+            runs=$(gh api "repos/$GH_REPO/actions/runs?event=pull_request&head_sha=$HEAD_SHA")
+            pending=$(jq -r '.workflow_runs[] | select(.conclusion == "action_required") | .id' <<< "$runs")
+            if [ -n "$pending" ]; then
+              while read -r run; do
+                echo "Approving workflow run $run"
+                gh api --method POST "repos/$GH_REPO/actions/runs/$run/approve"
+              done <<< "$pending"
+              exit 0
+            fi
+            if [ "$(jq -r '.total_count' <<< "$runs")" -gt 0 ]; then
+              echo "No workflow run is waiting for approval."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "No workflow run was registered for $HEAD_SHA."
