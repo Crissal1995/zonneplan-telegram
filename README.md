@@ -277,9 +277,12 @@ A Vercel **preview** deployment can be used the same way, but preview URLs sit b
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `qualify.yaml` | `pull_request` | Runs `ruff format --diff`, `ruff check`, `ty check` and `pytest` |
+| `approve-runs.yaml` | `pull_request_target` | Approves the `pull_request` runs waiting for approval on branches inside this repository |
 | `push.yaml` | `workflow_dispatch` | Runs `update-prices`, then commits the new data through an auto-merged pull request |
 
-`push.yaml` needs the `PAT` secret (a token with `repo` scope; the job already declares `contents: write` and `pull-requests: write`). It runs `update-prices`, closes any still-open pull request on the `automated-data-update` branch, opens a fresh one with `peter-evans/create-pull-request`, approves and squash-merges it with `--admin`. The approval and merge steps are skipped when no data changed and therefore no pull request was created.
+`push.yaml` authenticates with the auto-approval GitHub App (`APP_AUTOAPPROVAL_CLIENT_ID` and `APP_AUTOAPPROVAL_PRIVATE_KEY`), which needs `pull-requests: write` (approve, close and merge) and `actions: write` (release the workflow runs of `approve-runs.yaml`). It runs `update-prices`, closes any still-open pull request on the same dated branch, opens a fresh one with `peter-evans/create-pull-request`, then approves and squash-merges it with `--auto`. The approval and merge steps are skipped when no data changed and therefore no pull request was created. The data pull request is opened with the default `GITHUB_TOKEN`, so its author is `github-actions[bot]`: giving the app token to `create-pull-request` instead would make the app the author, and GitHub refuses an approval on your own pull request, so the approve step would stop working.
+
+GitHub parks a `pull_request` run in `action_required` — the *Some checks are waiting for approval* banner — when the pull request author has no write access to the repository, which is the case for every pull request a bot opens. Since `Qualification` is a required status check, such a pull request would wait forever, so `approve-runs.yaml` releases the runs of branches inside this repository. It runs on `pull_request_target`, which always runs regardless of the approval policy, and leaves forks untouched: the repository keeps *Require approval for all external contributors*, so a pull request from a fork still needs a maintainer to click **Approve workflows to run** (or `gh api --method POST repos/{owner}/{repo}/actions/runs/<run-id>/approve`).
 
 ## Project structure
 
@@ -287,6 +290,8 @@ A Vercel **preview** deployment can be used the same way, but preview URLs sit b
 .
 ├── app.py                        # Vercel entrypoint: re-exports the FastAPI app
 ├── .github/workflows/
+│   ├── approve-runs.yaml         # approve pending PR workflow runs automatically
+│   ├── auto-approve.yaml         # approve the pull requests of the maintainer and Renovate
 │   ├── qualify.yaml              # PR quality gate (tox)
 │   └── push.yaml                 # run update-prices + auto-merge data updates
 ├── data/                         # archived price history (one JSON per day)
